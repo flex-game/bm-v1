@@ -15,7 +15,7 @@ def generate_frame_description(image_path, prompt_file_path):
     with open(image_path, 'rb') as image_file:
         base64_image = base64.b64encode(image_file.read()).decode('utf-8')
 
-    response = openai.ChatCompletion.create(
+    response = openai.chat.completions.create(
         model="gpt-4-vision-preview",
         messages=[
             {
@@ -25,14 +25,20 @@ def generate_frame_description(image_path, prompt_file_path):
             {
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": "Analyse this Civ VI screenshot as instructed in your system prompt. Return the analysis as a text file."},
-                    {"type": "image_url", "image_url": f"data:image/jpeg;base64,{base64_image}"}
+                    {
+                        "type": "text",
+                        "text": "Analyse this Civ VI screenshot as instructed in your system prompt. Return the analysis as a text file."
+                    },
+                    {
+                        "type": "image",
+                        "image_url": f"data:image/jpeg;base64,{base64_image}"
+                    }
                 ]
             }
         ],
         max_tokens=1000
     )
-    return response['choices'][0]['message']['content']
+    return response.choices[0].message.content
 
 def generate_action_description(image_path1, image_path2, prompt_file_path):
     """Generate a description of the differences between two frames using OpenAI."""
@@ -46,7 +52,7 @@ def generate_action_description(image_path1, image_path2, prompt_file_path):
         base64_image1 = base64.b64encode(image_file1.read()).decode('utf-8')
         base64_image2 = base64.b64encode(image_file2.read()).decode('utf-8')
 
-    response = openai.ChatCompletion.create(
+    response = openai.chat.completions.create(
         model="gpt-4-vision-preview",
         messages=[
             {
@@ -56,12 +62,21 @@ def generate_action_description(image_path1, image_path2, prompt_file_path):
             {
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": "I am going to give you two screenshots and a text description of each. Where you can see a difference between the two images, or where there's an indication in the text of something that has changed, list the changes as bullet points. Specifically try and make each change an action that the player must have taken in order to effect that change. Do your best on order of operations if there are multiple actions the user must have taken.\n\nDescription of Frame 1:\n" + description1 + "\n\nDescription of Frame 2:\n" + description2 + "\n\nProvide the analysis as a new text file."},
-                    {"type": "image_url", "image_url": f"data:image/jpeg;base64,{base64_image1}"},
-                    {"type": "image_url", "image_url": f"data:image/jpeg;base64,{base64_image2}"}
+                    {
+                        "type": "text",
+                        "text": f"I am going to give you two screenshots and a text description of each. Where you can see a difference between the two images, or where there's an indication in the text of something that has changed, list the changes as bullet points. Specifically try and make each change an action that the player must have taken in order to effect that change. Do your best on order of operations if there are multiple actions the user must have taken.\n\nDescription of Frame 1:\n{description1}\n\nDescription of Frame 2:\n{description2}\n\nProvide the analysis as a new text file."
+                    },
+                    {
+                        "type": "image",
+                        "image_url": f"data:image/jpeg;base64,{base64_image1}"
+                    },
+                    {
+                        "type": "image",
+                        "image_url": f"data:image/jpeg;base64,{base64_image2}"
+                    }
                 ]
             }
         ],
         max_tokens=1000
     )
-    return response['choices'][0]['message']['content'] 
+    return response.choices[0].message.content 

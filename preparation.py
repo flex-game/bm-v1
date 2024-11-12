@@ -13,10 +13,24 @@ if not os.getenv('GOOGLE_APPLICATION_CREDENTIALS'):
 def ensure_gdrive_directories_exist(drive_service, root_folder_id, *directories):
     """Ensure that the specified directories exist in Google Drive, creating them if necessary."""
     folder_ids = {}
+    
     for directory in directories:
-        folder_id = create_folder(drive_service, directory, root_folder_id)
+        # First check if directory already exists
+        query = f"name='{directory}' and '{root_folder_id}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false"
+        results = drive_service.files().list(q=query, spaces='drive', fields='files(id, name)').execute()
+        existing_folders = results.get('files', [])
+        
+        if existing_folders:
+            # Use existing folder
+            folder_id = existing_folders[0]['id']
+            print(f"Found existing directory: {directory} with ID: {folder_id}")
+        else:
+            # Create new folder if it doesn't exist
+            folder_id = create_folder(drive_service, directory, root_folder_id)
+            print(f"Created new directory: {directory} with ID: {folder_id}")
+            
         folder_ids[directory] = folder_id
-        print(f"Ensured Google Drive directory: {directory} with ID: {folder_id}")
+    
     return folder_ids
 
 def process_frames(frames_folder_id, analysis_folder_id, actions_folder_id, system_prompt_path):
@@ -67,8 +81,8 @@ def process_frames(frames_folder_id, analysis_folder_id, actions_folder_id, syst
 if __name__ == "__main__":
     root_folder_id = input("Please enter root Google Drive folder ID: ")
     drive_service = authenticate_gdrive()
-    folder_ids = ensure_gdrive_directories_exist(drive_service, root_folder_id, 'frame_analysis', 'actions_analysis')
-    frames_folder_id = root_folder_id + "/frames"
+    folder_ids = ensure_gdrive_directories_exist(drive_service, root_folder_id, 'frame_analysis', 'actions_analysis', 'frames')
+    frames_folder_id = folder_ids['frames']
     analysis_folder_id = folder_ids['frame_analysis']
     actions_folder_id = folder_ids['actions_analysis']
     system_prompt_path = 'system_prompt.txt'  # Path to the system prompt file
