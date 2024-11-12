@@ -68,12 +68,12 @@ def generate_image_description(image_path, prompt_file_path):
             {
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": "Describe this image"},
+                    {"type": "text", "text": "Analyse this Civ VI screenshot as instructed in your system prompt. Return the analysis as a text file."},
                     {"type": "image_url", "image_url": f"data:image/jpeg;base64,{base64_image}"}
                 ]
             }
         ],
-        max_tokens=300
+        max_tokens=1000
     )
     return response['choices'][0]['message']['content']
 
