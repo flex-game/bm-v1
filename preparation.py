@@ -6,6 +6,7 @@ from googleapiclient.http import MediaIoBaseDownload, MediaFileUpload
 from oauth2client.service_account import ServiceAccountCredentials
 from dotenv import load_dotenv
 import openai
+import base64
 
 load_dotenv()  # Load environment variables from .env file
 
@@ -44,17 +45,43 @@ def upload_file(drive_service, folder_id, file_name, mime_type='text/plain'):
     media = MediaFileUpload(file_name, mimetype=mime_type)
     drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
 
-def generate_image_description(image_path):
+def load_system_prompt(prompt_file_path):
+    """Load the system prompt from a text file."""
+    with open(prompt_file_path, 'r') as file:
+        return file.read()
+
+def generate_image_description(image_path, prompt_file_path):
     """Generate a description for an image using OpenAI."""
     openai.api_key = os.getenv('OPENAI_API_KEY')
+    system_prompt = load_system_prompt(prompt_file_path)
+    
     with open(image_path, 'rb') as image_file:
-        response = openai.Image.create(file=image_file, purpose='description')
-    return response['choices'][0]['text']
+        base64_image = base64.b64encode(image_file.read()).decode('utf-8')
 
-def process_images_in_directory(folder_id):
+    response = openai.ChatCompletion.create(
+        model="gpt-4-vision-preview",
+        messages=[
+            {
+                "role": "system",
+                "content": system_prompt
+            },
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "Describe this image"},
+                    {"type": "image_url", "image_url": f"data:image/jpeg;base64,{base64_image}"}
+                ]
+            }
+        ],
+        max_tokens=300
+    )
+    return response['choices'][0]['message']['content']
+
+def process_images_in_directory(frames_folder_id, analysis_folder_id, prompt_file_path):
     """Process JPEG images in a Google Drive directory and save descriptions."""
+    
     drive_service = authenticate_gdrive()
-    jpg_files = list_jpg_files_in_directory(drive_service, folder_id)
+    jpg_files = list_jpg_files_in_directory(drive_service, frames_folder_id)
     
     for jpg_file in jpg_files:
         file_id = jpg_file['id']
@@ -64,20 +91,23 @@ def process_images_in_directory(folder_id):
         download_file(drive_service, file_id, file_name)
         
         # Generate description
-        description = generate_image_description(file_name)
+        description = generate_image_description(file_name, prompt_file_path)
         
         # Save description to a text file
         text_file_name = f"{os.path.splitext(file_name)[0]}.txt"
         with open(text_file_name, 'w') as text_file:
             text_file.write(description)
         
-        # Upload the text file back to Google Drive
-        upload_file(drive_service, folder_id, text_file_name)
+        # Upload the text file to the "frame_analysis" folder
+        upload_file(drive_service, analysis_folder_id, text_file_name)
         
         # Clean up local files
         os.remove(file_name)
         os.remove(text_file_name)
 
 if __name__ == "__main__":
-    folder_id = 'YOUR_GOOGLE_DRIVE_FOLDER_ID'  # Update with your actual folder ID
-    process_images_in_directory(folder_id) 
+    root_folder_id = input("Please enter root Google Drive folder ID: ")
+    frames_folder_id = root_folder_id + "/frames"
+    analysis_folder_id = root_folder_id + "/frame_analysis"
+    prompt_file_path = 'system_prompt.txt'  # Path to the system prompt file
+    process_images_in_directory(frames_folder_id, analysis_folder_id, prompt_file_path)
