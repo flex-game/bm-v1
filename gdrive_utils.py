@@ -12,7 +12,7 @@ def authenticate_gdrive():
     drive_service = build('drive', 'v3', credentials=creds)
     return drive_service
 
-def list_jpg_files_in_directory(drive_service, folder_id):
+def list_jpg_files(drive_service, folder_id):
     """List all JPEG files in a specified Google Drive directory."""
     query = f"'{folder_id}' in parents and mimeType='image/jpeg'"
     results = drive_service.files().list(q=query).execute()
