@@ -16,7 +16,7 @@ def generate_frame_description(image_path, prompt_file_path):
         base64_image = base64.b64encode(image_file.read()).decode('utf-8')
 
     response = openai.chat.completions.create(
-        model="gpt-4-vision-preview",
+        model="gpt-4o",
         messages=[
             {
                 "role": "system",
@@ -53,7 +53,7 @@ def generate_action_description(image_path1, image_path2, prompt_file_path):
         base64_image2 = base64.b64encode(image_file2.read()).decode('utf-8')
 
     response = openai.chat.completions.create(
-        model="gpt-4-vision-preview",
+        model="gpt-4o",
         messages=[
             {
                 "role": "system",
