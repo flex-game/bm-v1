@@ -30,7 +30,7 @@ def generate_frame_description(image_path, prompt_file_path):
                         "text": "Analyse this Civ VI screenshot as instructed in your system prompt. Return the analysis as a text file."
                     },
                     {
-                        "type": "image",
+                        "type": "image_url",
                         "image_url": f"data:image/jpeg;base64,{base64_image}"
                     }
                 ]
