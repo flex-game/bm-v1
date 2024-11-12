@@ -25,11 +25,6 @@ def process_frames(frames_folder_id, analysis_folder_id, actions_folder_id, syst
     drive_service = authenticate_gdrive()
     jpg_files = list_jpg_files(drive_service, frames_folder_id)
     
-    # Ensure there are at least two frames to process
-    if len(jpg_files) < 2:
-        print("Not enough frames to process.")
-        return
-    
     for i in range(len(jpg_files) - 1):
         file_id1 = jpg_files[i]['id']
         file_name1 = jpg_files[i]['name']

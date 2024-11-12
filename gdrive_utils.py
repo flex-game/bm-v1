@@ -8,6 +8,8 @@ def authenticate_gdrive():
     """Authenticate and return a Google Drive client."""
     scope = ["https://www.googleapis.com/auth/drive"]
     credentials_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
+    if not credentials_path:
+        raise ValueError("GOOGLE_APPLICATION_CREDENTIALS environment variable is not set or is empty.")
     creds = ServiceAccountCredentials.from_json_keyfile_name(credentials_path, scope)
     drive_service = build('drive', 'v3', credentials=creds)
     return drive_service
