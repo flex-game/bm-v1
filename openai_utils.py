@@ -63,8 +63,16 @@ def generate_action_description(image_url1, image_url2, prompt_file_path):
                         "image_url": image_url1
                     },
                     {
+                        "type": "text",
+                        "text": description1
+                    },
+                    {
                         "type": "image_url",
                         "image_url": image_url2
+                    },
+                    {
+                        "type": "text",
+                        "text": description2
                     }
                 ]
             }
