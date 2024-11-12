@@ -38,3 +38,13 @@ def upload_file(drive_service, folder_id, file_name, mime_type='text/plain'):
     }
     media = MediaFileUpload(file_name, mimetype=mime_type)
     drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute() 
+
+def create_folder(drive_service, folder_name, parent_folder_id):
+    """Create a folder in Google Drive."""
+    file_metadata = {
+        'name': folder_name,
+        'mimeType': 'application/vnd.google-apps.folder',
+        'parents': [parent_folder_id]
+    }
+    folder = drive_service.files().create(body=file_metadata, fields='id').execute()
+    return folder.get('id')

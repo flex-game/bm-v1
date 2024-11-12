@@ -1,23 +1,26 @@
 import os
 from dotenv import load_dotenv
-from gdrive_utils import authenticate_gdrive, list_jpg_files, download_file, upload_file
+from gdrive_utils import authenticate_gdrive, list_jpg_files, download_file, upload_file, create_folder
 from openai_utils import generate_frame_description, generate_action_description
 from file_utils import save_text_to_file, clean_up_files
 
 load_dotenv()  # Load environment variables from .env file
 
-def ensure_directories_exist(*directories):
-    """Ensure that the specified directories exist, creating them if necessary."""
+# Add this line after load_dotenv() and before any function definitions
+if not os.getenv('GOOGLE_APPLICATION_CREDENTIALS'):
+    raise ValueError("GOOGLE_APPLICATION_CREDENTIALS environment variable is not set")
+
+def ensure_gdrive_directories_exist(drive_service, root_folder_id, *directories):
+    """Ensure that the specified directories exist in Google Drive, creating them if necessary."""
+    folder_ids = {}
     for directory in directories:
-        if not os.path.exists(directory):
-            os.makedirs(directory)
-            print(f"Created directory: {directory}")
+        folder_id = create_folder(drive_service, directory, root_folder_id)
+        folder_ids[directory] = folder_id
+        print(f"Ensured Google Drive directory: {directory} with ID: {folder_id}")
+    return folder_ids
 
 def process_frames(frames_folder_id, analysis_folder_id, actions_folder_id, system_prompt_path):
     """Process JPG frames in a Google Drive directory and save descriptions."""
-    
-    # Ensure necessary directories exist
-    ensure_directories_exist('frames', 'frame_analysis', 'actions_analysis')
     
     drive_service = authenticate_gdrive()
     jpg_files = list_jpg_files(drive_service, frames_folder_id)
@@ -68,8 +71,10 @@ def process_frames(frames_folder_id, analysis_folder_id, actions_folder_id, syst
 
 if __name__ == "__main__":
     root_folder_id = input("Please enter root Google Drive folder ID: ")
+    drive_service = authenticate_gdrive()
+    folder_ids = ensure_gdrive_directories_exist(drive_service, root_folder_id, 'frame_analysis', 'actions_analysis')
     frames_folder_id = root_folder_id + "/frames"
-    analysis_folder_id = root_folder_id + "/frame_analysis"
-    actions_folder_id = root_folder_id + "/actions_analysis"
+    analysis_folder_id = folder_ids['frame_analysis']
+    actions_folder_id = folder_ids['actions_analysis']
     system_prompt_path = 'system_prompt.txt'  # Path to the system prompt file
     process_frames(frames_folder_id, analysis_folder_id, actions_folder_id, system_prompt_path)
