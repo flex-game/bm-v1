@@ -53,8 +53,8 @@ def process_frames(frames_folder_id, analysis_folder_id, actions_folder_id, syst
                 
         print(f"Generating descriptions for frames: {file_name1} and {file_name2}")
         # Get the file URLs from Google Drive
-        file1_url = f"https://drive.google.com/uc?id={file_id1}"
-        file2_url = f"https://drive.google.com/uc?id={file_id2}"
+        file1_url = f"https://drive.google.com/file/d/{file_id1}/view?usp=sharing"
+        file2_url = f"https://drive.google.com/uc?id={file_id2}&export=download"
         
         description1 = generate_frame_description(file1_url, system_prompt_path)
         description2 = generate_frame_description(file2_url, system_prompt_path)
