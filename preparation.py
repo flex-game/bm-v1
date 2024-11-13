@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from gdrive_utils import authenticate_gdrive, list_jpg_files, upload_file, create_folder, upload_text_content
+from gdrive_utils import authenticate_gdrive, list_jpg_files, create_folder, upload_text_content
 from openai_utils import generate_frame_description, generate_action_description
 from file_utils import save_text_to_file, clean_up_files
 
