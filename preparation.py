@@ -84,7 +84,15 @@ def process_frames(frames_folder_id, analysis_folder_id, actions_folder_id, syst
         file1_url = get_image_as_base64(drive_service, file_id1)
         file2_url = get_image_as_base64(drive_service, file_id2)
         
-        action_description = generate_action_description(file1_url, file2_url, system_prompt_path)
+        action_description = generate_action_description(
+            drive_service,
+            analysis_folder_id,
+            file1_url,
+            file2_url,
+            file_name1,
+            file_name2,
+            system_prompt_path
+        )
         
         print(f"Uploading action description to actions_analysis folder")
         action_text_file_name = f"action_{os.path.splitext(file_name1)[0]}_{os.path.splitext(file_name2)[0]}.txt"
