@@ -55,14 +55,7 @@ def natural_sort_key(file):
 def process_frames(frames_folder_id, analysis_folder_id, actions_folder_id, system_prompt_path):
     drive_service = authenticate_gdrive()
     jpg_files = list_jpg_files(drive_service, frames_folder_id)
-    
-    # Filter and sort the files
-    jpg_files = [f for f in jpg_files if f['name'].startswith('frame_')]
     jpg_files.sort(key=natural_sort_key)
-    
-    if len(jpg_files) < 2:
-        print("Not enough frames to process.")
-        return
     
     print(f"Processing {len(jpg_files)} frames...")
 
