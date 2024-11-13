@@ -44,13 +44,18 @@ def get_image_as_base64(drive_service, file_id):
     base64_image = base64.b64encode(image_data).decode('utf-8')
     return f"data:image/jpeg;base64,{base64_image}"
 
+def natural_sort_key(file):
+    # Split the filename into parts and convert numbers to integers for proper sorting
+    parts = file['name'].split('_')
+    return [int(part) if part.isdigit() else part for part in parts[1:3]]
+
 def process_frames(frames_folder_id, analysis_folder_id, actions_folder_id, system_prompt_path):
     drive_service = authenticate_gdrive()
     jpg_files = list_jpg_files(drive_service, frames_folder_id)
     
     # Filter and sort the files
     jpg_files = [f for f in jpg_files if f['name'].startswith('frame_')]
-    jpg_files.sort(key=lambda x: int(x['name'].split('_')[1].split('.')[0]))
+    jpg_files.sort(key=natural_sort_key)
     
     if len(jpg_files) < 2:
         print("Not enough frames to process.")
