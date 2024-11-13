@@ -5,6 +5,7 @@ from openai_utils import generate_frame_description, generate_action_description
 import base64
 import io
 from googleapiclient.http import MediaIoBaseDownload
+import re
 
 load_dotenv()  # Load environment variables from .env file
 
@@ -45,9 +46,11 @@ def get_image_as_base64(drive_service, file_id):
     return f"data:image/jpeg;base64,{base64_image}"
 
 def natural_sort_key(file):
-    # Split the filename into parts and convert numbers to integers for proper sorting
-    parts = file['name'].split('_')
-    return [int(part) if part.isdigit() else part for part in parts[1:3]]
+    # Extract numbers from the filename using regex
+    name = file['name']
+    # This will extract all numbers from the filename
+    numbers = [int(num) for num in re.findall(r'\d+', name)]
+    return numbers  # Returns [1, 1] for frame_1_1, [1, 10] for frame_1_10
 
 def process_frames(frames_folder_id, analysis_folder_id, actions_folder_id, system_prompt_path):
     drive_service = authenticate_gdrive()

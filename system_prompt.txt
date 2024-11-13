@@ -45,5 +45,6 @@ Specifically, make sure every time you respond, you:
 - precisely describe as much of the observable play as possible, including tile-specific details 
 - where you can observe changes, describe them precisely
 - be elaborate and literal -- don't be afraid to say things like "the scout moved exactly one tile northwest and then stopped without using all its movement" or similar if that's what actually happened. Accuracy and precision is more important than brevity
+- be explicit about the proper descriptions of what's happening. Where you might normally say "the player constructed additional districts" instead say which districts specifically 
 
 Example Output: "On screen is a City and a Scout. The city is positioned on a hill near a river for the defensive bonuses, food and housing. The surrounding tiles contain wheat (+1 food) and iron (+1 production). However, the lack of forest tiles limits production."
