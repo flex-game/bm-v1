@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from gdrive_utils import authenticate_gdrive, list_jpg_files, upload_file, create_folder
+from gdrive_utils import authenticate_gdrive, list_jpg_files, upload_file, create_folder, upload_text_content
 from openai_utils import generate_frame_description, generate_action_description
 from file_utils import save_text_to_file, clean_up_files
 
@@ -65,8 +65,8 @@ def process_frames(frames_folder_id, analysis_folder_id, actions_folder_id, syst
         save_text_to_file(text_file_name2, description2)
         
         print(f"Uploading descriptions to frame_analysis folder")
-        upload_file(drive_service, analysis_folder_id, text_file_name1)
-        upload_file(drive_service, analysis_folder_id, text_file_name2)
+        upload_text_content(drive_service, analysis_folder_id, text_file_name1, description1)
+        upload_text_content(drive_service, analysis_folder_id, text_file_name2, description2)
         
         print(f"Generating action description for frames: {file_name1} and {file_name2}")
         action_description = generate_action_description(file1_url, file2_url, system_prompt_path)

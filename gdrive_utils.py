@@ -1,7 +1,7 @@
 import os
 import io
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseDownload, MediaFileUpload
+from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
 from oauth2client.service_account import ServiceAccountCredentials
 
 def authenticate_gdrive():
@@ -20,15 +20,6 @@ def list_jpg_files(drive_service, folder_id):
     results = drive_service.files().list(q=query).execute()
     return results.get('files', [])
 
-def upload_file(drive_service, folder_id, file_name, mime_type='text/plain'):
-    """Upload a file to Google Drive."""
-    file_metadata = {
-        'name': file_name,
-        'parents': [folder_id]
-    }
-    media = MediaFileUpload(file_name, mimetype=mime_type)
-    drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute() 
-
 def create_folder(drive_service, folder_name, parent_folder_id):
     """Create a folder in Google Drive."""
     file_metadata = {
@@ -38,3 +29,24 @@ def create_folder(drive_service, folder_name, parent_folder_id):
     }
     folder = drive_service.files().create(body=file_metadata, fields='id').execute()
     return folder.get('id')
+
+def upload_text_content(service, folder_id, filename, content):
+    """Upload text content directly to Google Drive without saving locally first."""
+    file_metadata = {
+        'name': filename,
+        'parents': [folder_id]
+    }
+    
+    media = MediaIoBaseUpload(
+        io.BytesIO(content.encode('utf-8')),
+        mimetype='text/plain',
+        resumable=True
+    )
+    
+    file = service.files().create(
+        body=file_metadata,
+        media_body=media,
+        fields='id'
+    ).execute()
+    
+    return file.get('id')
