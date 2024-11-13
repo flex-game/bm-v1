@@ -5,6 +5,8 @@ import numpy as np
 import pandas as pd
 from training import DataRepository  # Assuming DataRepository is in training.py
 from gdrive_utils import download_file_from_gdrive  # Assuming this function is defined in gdrive_utils.py
+from pydrive.auth import GoogleAuth
+from pydrive.drive import GoogleDrive
 
 def load_trained_model(model_path):
     return load_model(model_path)
@@ -28,10 +30,29 @@ def predict_actions(model, game_state_sequences, tokenizer):
         predicted_actions.append(' '.join(actions))
     return predicted_actions
 
+def authenticate_gdrive():
+    gauth = GoogleAuth()
+    gauth.LocalWebserverAuth()  # Creates local webserver and automatically handles authentication
+    drive = GoogleDrive(gauth)
+    return drive
+
+def upload_to_gdrive(drive, file_path, gdrive_folder_id):
+    file = drive.CreateFile({'parents': [{'id': gdrive_folder_id}]})
+    file.SetContentFile(file_path)
+    file.Upload()
+    print(f"Uploaded {file_path} to Google Drive folder {gdrive_folder_id}")
+
 def main():
+    # Authenticate Google Drive
+    drive = authenticate_gdrive()
+
     # Load the trained model
-    model_path = 'path/to/your/saved_model.h5'  # Update with your model's path
+    model_path = 'gdrive/My Drive/path/to/your/saved_model.h5'  # Update with your model's path
     model = load_trained_model(model_path)
+
+    # Example: Upload the model to Google Drive
+    gdrive_folder_id = 'your_gdrive_folder_id'  # Replace with your Google Drive folder ID
+    upload_to_gdrive(drive, model_path, gdrive_folder_id)
 
     # Load tokenizer and max_sequence_length from training
     # You might need to save and load these from a file or use a consistent method to retrieve them
