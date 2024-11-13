@@ -8,9 +8,6 @@ from gdrive_utils import download_file_from_gdrive  # Assuming this function is 
 from pydrive.auth import GoogleAuth
 from pydrive.drive import GoogleDrive
 
-def load_trained_model(model_path):
-    return load_model(model_path)
-
 def preprocess_input(game_state_descriptions, tokenizer, max_sequence_length):
     # Tokenize and pad the input game state descriptions
     sequences = tokenizer.texts_to_sequences(game_state_descriptions)
@@ -42,23 +39,36 @@ def upload_to_gdrive(drive, file_path, gdrive_folder_id):
     file.Upload()
     print(f"Uploaded {file_path} to Google Drive folder {gdrive_folder_id}")
 
+def load_model_and_tokenizer():
+    """
+    Load the trained model, tokenizer, and configuration settings from Google Drive
+    Returns:
+        tuple: (model, tokenizer, max_sequence_length)
+    """
+    model_folder_id = '14rV_AfSINfFyUQgZN4wJEgGtJCyzlv0a'
+    model_file_id = 'your_specific_model_file_id'
+    max_sequence_length = 100  # Or load this from config
+    
+    # Initialize Drive service (you'll need this)
+    drive_service = initialize_drive_service()
+    
+    # Download and load model from Google Drive
+    request = drive_service.files().get_media(fileId=model_file_id)
+    model = tf.keras.models.load_model(request)
+    
+    # Similarly for tokenizer if it's stored in Drive
+    tokenizer = load_tokenizer(drive_service, model_folder_id)
+    
+    return model, tokenizer, max_sequence_length
+
 def main():
+    
     # Authenticate Google Drive
     drive = authenticate_gdrive()
 
-    # Load the trained model
-    model_path = 'gdrive/My Drive/path/to/your/saved_model.h5'  # Update with your model's path
-    model = load_trained_model(model_path)
-
-    # Example: Upload the model to Google Drive
-    gdrive_folder_id = 'your_gdrive_folder_id'  # Replace with your Google Drive folder ID
-    upload_to_gdrive(drive, model_path, gdrive_folder_id)
-
-    # Load tokenizer and max_sequence_length from training
-    # You might need to save and load these from a file or use a consistent method to retrieve them
-    tokenizer = ...  # Load your tokenizer
-    max_sequence_length = ...  # Set your max sequence length
-
+    # Load model and configuration
+    model, tokenizer, max_sequence_length = load_model_and_tokenizer()
+    
     # Example game state descriptions
     game_state_descriptions = [
         "Example game state 1",
