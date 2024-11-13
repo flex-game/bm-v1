@@ -2,7 +2,6 @@ import os
 from dotenv import load_dotenv
 from gdrive_utils import authenticate_gdrive, list_jpg_files, create_folder, upload_text_content
 from openai_utils import generate_frame_description, generate_action_description
-from file_utils import save_text_to_file, clean_up_files
 
 load_dotenv()  # Load environment variables from .env file
 
@@ -61,8 +60,6 @@ def process_frames(frames_folder_id, analysis_folder_id, actions_folder_id, syst
         
         text_file_name1 = f"{os.path.splitext(file_name1)[0]}.txt"
         text_file_name2 = f"{os.path.splitext(file_name2)[0]}.txt"
-        save_text_to_file(text_file_name1, description1)
-        save_text_to_file(text_file_name2, description2)
         
         print(f"Uploading descriptions to frame_analysis folder")
         upload_text_content(drive_service, analysis_folder_id, text_file_name1, description1)
@@ -70,15 +67,10 @@ def process_frames(frames_folder_id, analysis_folder_id, actions_folder_id, syst
         
         print(f"Generating action description for frames: {file_name1} and {file_name2}")
         action_description = generate_action_description(file1_url, file2_url, system_prompt_path)
-        
-        action_text_file_name = f"action_{os.path.splitext(file_name1)[0]}_{os.path.splitext(file_name2)[0]}.txt"
-        save_text_to_file(action_text_file_name, action_description)
-        
+
         print(f"Uploading action description to actions_analysis folder")
-        upload_file(drive_service, actions_folder_id, action_text_file_name)
-        
-        print(f"Cleaning up local files for frames: {file_name1} and {file_name2}")
-        clean_up_files(file_name1, file_name2, text_file_name1, text_file_name2, action_text_file_name)
+        action_text_file_name = f"action_{os.path.splitext(file_name1)[0]}_{os.path.splitext(file_name2)[0]}.txt"
+        upload_text_content(drive_service, actions_folder_id, action_text_file_name, action_description)
 
     print("Game analysis complete.")
 
