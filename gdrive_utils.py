@@ -20,18 +20,6 @@ def list_jpg_files(drive_service, folder_id):
     results = drive_service.files().list(q=query).execute()
     return results.get('files', [])
 
-def download_file(drive_service, file_id, file_name):
-    """Download a file from Google Drive."""
-    request = drive_service.files().get_media(fileId=file_id)
-    fh = io.BytesIO()
-    downloader = MediaIoBaseDownload(fh, request)
-    done = False
-    while done is False:
-        status, done = downloader.next_chunk()
-    fh.seek(0)
-    with open(file_name, 'wb') as f:
-        f.write(fh.read())
-
 def upload_file(drive_service, folder_id, file_name, mime_type='text/plain'):
     """Upload a file to Google Drive."""
     file_metadata = {

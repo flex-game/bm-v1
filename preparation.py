@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from gdrive_utils import authenticate_gdrive, list_jpg_files, download_file, upload_file, create_folder
+from gdrive_utils import authenticate_gdrive, list_jpg_files, upload_file, create_folder
 from openai_utils import generate_frame_description, generate_action_description
 from file_utils import save_text_to_file, clean_up_files
 
@@ -50,14 +50,14 @@ def process_frames(frames_folder_id, analysis_folder_id, actions_folder_id, syst
         file_name1 = jpg_files[i]['name']
         file_id2 = jpg_files[i + 1]['id']
         file_name2 = jpg_files[i + 1]['name']
-        
-        print(f"Downloading frames: {file_name1} and {file_name2}")
-        download_file(drive_service, file_id1, file_name1)
-        download_file(drive_service, file_id2, file_name2)
-        
+                
         print(f"Generating descriptions for frames: {file_name1} and {file_name2}")
-        description1 = generate_frame_description(file_name1, system_prompt_path)
-        description2 = generate_frame_description(file_name2, system_prompt_path)
+        # Get the file URLs from Google Drive
+        file1_url = f"https://drive.google.com/uc?id={file_id1}"
+        file2_url = f"https://drive.google.com/uc?id={file_id2}"
+        
+        description1 = generate_frame_description(file1_url, system_prompt_path)
+        description2 = generate_frame_description(file2_url, system_prompt_path)
         
         text_file_name1 = f"{os.path.splitext(file_name1)[0]}.txt"
         text_file_name2 = f"{os.path.splitext(file_name2)[0]}.txt"
@@ -69,7 +69,7 @@ def process_frames(frames_folder_id, analysis_folder_id, actions_folder_id, syst
         upload_file(drive_service, analysis_folder_id, text_file_name2)
         
         print(f"Generating action description for frames: {file_name1} and {file_name2}")
-        action_description = generate_action_description(file_name1, file_name2, system_prompt_path)
+        action_description = generate_action_description(file1_url, file2_url, system_prompt_path)
         
         action_text_file_name = f"action_{os.path.splitext(file_name1)[0]}_{os.path.splitext(file_name2)[0]}.txt"
         save_text_to_file(action_text_file_name, action_description)

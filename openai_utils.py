@@ -8,6 +8,7 @@ def load_system_prompt(prompt_file_path):
 
 def generate_frame_description(image_url, prompt_file_path):
     """Generate a description for a frame using OpenAI."""
+    
     openai.api_key = os.getenv('OPENAI_API_KEY')
     system_prompt = load_system_prompt(prompt_file_path)
 
