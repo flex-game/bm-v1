@@ -55,7 +55,10 @@ def natural_sort_key(file):
 def process_frames(frames_folder_id, analysis_folder_id, actions_folder_id, system_prompt_path):
     drive_service = authenticate_gdrive()
     jpg_files = list_jpg_files(drive_service, frames_folder_id)
-    jpg_files.sort(key=natural_sort_key)
+    
+    # Filter and sort the files
+    jpg_files = [f for f in jpg_files if f['name'].endswith('.jpg')]
+    jpg_files.sort(key=lambda x: int(os.path.splitext(x['name'])[0]))
     
     print(f"Processing {len(jpg_files)} frames...")
 
