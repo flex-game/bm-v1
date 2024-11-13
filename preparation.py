@@ -2,6 +2,9 @@ import os
 from dotenv import load_dotenv
 from gdrive_utils import authenticate_gdrive, list_jpg_files, create_folder, upload_text_content
 from openai_utils import generate_frame_description, generate_action_description
+import base64
+import io
+from googleapiclient.http import MediaIoBaseDownload
 
 load_dotenv()  # Load environment variables from .env file
 
@@ -28,13 +31,24 @@ def ensure_gdrive_directories_exist(drive_service, root_folder_id, *directories)
     
     return folder_ids
 
-def process_frames(frames_folder_id, analysis_folder_id, actions_folder_id, system_prompt_path):
-    """Process JPG frames in a Google Drive directory and save descriptions."""
+def get_image_as_base64(drive_service, file_id):
+    """Download image from Drive and convert to base64."""
+    request = drive_service.files().get_media(fileId=file_id)
+    fh = io.BytesIO()
+    downloader = MediaIoBaseDownload(fh, request)
+    done = False
+    while done is False:
+        status, done = downloader.next_chunk()
     
+    image_data = fh.getvalue()
+    base64_image = base64.b64encode(image_data).decode('utf-8')
+    return f"data:image/jpeg;base64,{base64_image}"
+
+def process_frames(frames_folder_id, analysis_folder_id, actions_folder_id, system_prompt_path):
     drive_service = authenticate_gdrive()
     jpg_files = list_jpg_files(drive_service, frames_folder_id)
     
-    # Filter and sort the files to ensure they are processed in order
+    # Filter and sort the files
     jpg_files = [f for f in jpg_files if f['name'].startswith('frame_')]
     jpg_files.sort(key=lambda x: int(x['name'].split('_')[1].split('.')[0]))
     
@@ -44,30 +58,34 @@ def process_frames(frames_folder_id, analysis_folder_id, actions_folder_id, syst
     
     print(f"Processing {len(jpg_files)} frames...")
 
+    # First, generate and upload all frame descriptions
+    print("Generating frame descriptions...")
+    for file in jpg_files:
+        file_id = file['id']
+        file_name = file['name']
+        print(f"Processing frame: {file_name}")
+        
+        file_url = get_image_as_base64(drive_service, file_id)
+        description = generate_frame_description(file_url, system_prompt_path)
+        
+        text_file_name = f"{os.path.splitext(file_name)[0]}.txt"
+        print(f"Uploading description to frame_analysis folder")
+        upload_text_content(drive_service, analysis_folder_id, text_file_name, description)
+
+    # Then, generate action descriptions using the stored frame descriptions
+    print("Generating action descriptions...")
     for i in range(len(jpg_files) - 1):
-        file_id1 = jpg_files[i]['id']
         file_name1 = jpg_files[i]['name']
-        file_id2 = jpg_files[i + 1]['id']
         file_name2 = jpg_files[i + 1]['name']
-                
-        print(f"Generating descriptions for frames: {file_name1} and {file_name2}")
-        # Get the file URLs from Google Drive
-        file1_url = f"https://drive.google.com/file/d/{file_id1}/view?usp=sharing"
-        file2_url = f"https://drive.google.com/uc?id={file_id2}&export=download"
-        
-        description1 = generate_frame_description(file1_url, system_prompt_path)
-        description2 = generate_frame_description(file2_url, system_prompt_path)
-        
-        text_file_name1 = f"{os.path.splitext(file_name1)[0]}.txt"
-        text_file_name2 = f"{os.path.splitext(file_name2)[0]}.txt"
-        
-        print(f"Uploading descriptions to frame_analysis folder")
-        upload_text_content(drive_service, analysis_folder_id, text_file_name1, description1)
-        upload_text_content(drive_service, analysis_folder_id, text_file_name2, description2)
+        file_id1 = jpg_files[i]['id']
+        file_id2 = jpg_files[i + 1]['id']
         
         print(f"Generating action description for frames: {file_name1} and {file_name2}")
+        file1_url = get_image_as_base64(drive_service, file_id1)
+        file2_url = get_image_as_base64(drive_service, file_id2)
+        
         action_description = generate_action_description(file1_url, file2_url, system_prompt_path)
-
+        
         print(f"Uploading action description to actions_analysis folder")
         action_text_file_name = f"action_{os.path.splitext(file_name1)[0]}_{os.path.splitext(file_name2)[0]}.txt"
         upload_text_content(drive_service, actions_folder_id, action_text_file_name, action_description)
