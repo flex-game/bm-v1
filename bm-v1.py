@@ -149,5 +149,15 @@ def main():
     if os.path.exists('game_state.txt'):
         os.remove('game_state.txt')
 
+    # After loading the model and tokenizer, add:
+    print("Model config:", model.get_config())
+    print("\nTokenizer config:", tokenizer.get_config())
+    print("\nTokenizer word index:", dict(list(tokenizer.word_index.items())[:5]))
+    print("\nTokenizer special tokens:", {
+        'pad_token': tokenizer.pad_token,
+        'start_token': getattr(tokenizer, 'start_token', None),
+        'end_token': getattr(tokenizer, 'end_token', None)
+    })
+
 if __name__ == "__main__":
     main()
