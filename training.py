@@ -8,6 +8,7 @@ from tensorflow.keras.preprocessing.text import Tokenizer
 import shutil
 import pickle
 import os
+import numpy as np
 
 def create_seq2seq_model(vocab_size, embedding_dim, max_sequence_length):
     # Encoder
@@ -121,6 +122,51 @@ def save_to_drive(drive_service, model, tokenizer, folder_id):
         print("Temporary files deleted successfully.")
     except Exception as e:
         print(f"Error deleting temporary files: {e}")
+
+def preprocess_input(text, tokenizer, max_sequence_length):
+    """Preprocess the input text for prediction."""
+    # Encoder input
+    encoder_sequences = tokenizer.texts_to_sequences([text])
+    encoder_input = pad_sequences(encoder_sequences, maxlen=max_sequence_length)
+    
+    # Decoder input - start with START token
+    # Adjust START_TOKEN_ID based on your tokenizer
+    START_TOKEN_ID = 1  # Ensure this matches your tokenizer's start token
+    decoder_input = np.array([[START_TOKEN_ID]])
+    decoder_input = pad_sequences(decoder_input, maxlen=max_sequence_length, padding='post')
+    
+    return [encoder_input, decoder_input]
+
+def predict_actions(model, input_sequences, tokenizer):
+    """Predict actions from the input sequence using the model."""
+    encoder_input, decoder_input = input_sequences
+    
+    # Initialize variables for beam search or greedy search
+    max_length = 100  # Maximum length of generated sequence
+    target_sequence = decoder_input
+    
+    # Generate the sequence one word at a time
+    generated_sequence = []
+    for i in range(max_length):
+        # Predict next token
+        output = model.predict([encoder_input, target_sequence])
+        sampled_token_index = np.argmax(output[0, -1, :])
+        
+        # Exit condition: either hit max length or end token
+        if sampled_token_index == 0:  # Assuming 0 is padding/end token
+            break
+            
+        generated_sequence.append(sampled_token_index)
+        
+        # Update the decoder input for the next iteration
+        target_sequence = np.zeros((1, max_length))
+        target_sequence[0, :len(generated_sequence)] = generated_sequence
+        target_sequence = pad_sequences(target_sequence, maxlen=max_length, padding='post')
+
+    # Convert predicted sequences back to text
+    reverse_word_index = {index: word for word, index in tokenizer.word_index.items()}
+    predicted_actions = [reverse_word_index.get(idx, '') for idx in generated_sequence if idx != 0]
+    return [' '.join(predicted_actions)]
 
 def main():
     print("Initializing Google Drive connection...")
