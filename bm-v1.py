@@ -5,7 +5,7 @@ import tensorflow as tf
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from gdrive_utils import authenticate_gdrive
 import io
-from googleapiclient.http import MediaIoBaseDownload
+from googleapiclient.http import MediaIoBaseDownload, MediaFileUpload
 
 def preprocess_input(text, tokenizer, max_sequence_length):
     """Preprocess the input text for prediction."""
@@ -143,48 +143,49 @@ def main():
     # Predict actions
     predicted_actions = predict_actions(model, input_sequence, tokenizer)
 
-    # After predicting actions, save and upload them
-    print("Predicted Actions:")
+    # After predicting actions
+    print("\nPredicted Actions:")
     with open('action_prediction.txt', 'w') as f:
         for actions in predicted_actions:
-            print(actions)  # Still print to console
-            f.write(actions + '\n')  # Write to file
-
-    # Upload prediction file to Google Drive
-    print("Uploading predictions to Google Drive...")
+            print(actions)  # Print each prediction
+            f.write(actions + '\n')
+    
+    print("\nUploading to Google Drive...")
     drive_service = authenticate_gdrive()
     
-    file_metadata = {
-        'name': 'action_prediction.txt',
-        'mimeType': 'text/plain'
-    }
-    
-    from googleapiclient.http import MediaFileUpload
-    media = MediaFileUpload('action_prediction.txt', 
-                           mimetype='text/plain',
-                           resumable=True)
-    
-    # Check if file already exists
-    query = "name='action_prediction.txt' and trashed=false"
-    results = drive_service.files().list(q=query).execute()
-    files = results.get('files', [])
-    
-    if files:
-        # Update existing file
-        file = drive_service.files().update(
-            fileId=files[0]['id'],
-            media_body=media,
-            fields='id'
-        ).execute()
-    else:
-        # Create new file
-        file = drive_service.files().create(
-            body=file_metadata,
-            media_body=media,
-            fields='id'
-        ).execute()
-    
-    print(f"Predictions saved to Google Drive with file ID: {file.get('id')}")
+    try:
+        media = MediaFileUpload('action_prediction.txt', 
+                              mimetype='text/plain',
+                              resumable=True)
+        
+        # Set the specific folder ID where models are stored
+        file_metadata = {
+            'name': 'action_prediction.txt',
+            'mimeType': 'text/plain',
+            'parents': ['14rV_AfSINfFyUQgZN4wJEgGtJCyzlv0a']  # Specific folder ID
+        }
+        
+        # Check if file exists in this specific folder
+        query = "name='action_prediction.txt' and '14rV_AfSINfFyUQgZN4wJEgGtJCyzlv0a' in parents and trashed=false"
+        results = drive_service.files().list(q=query).execute()
+        files = results.get('files', [])
+        
+        if files:
+            file = drive_service.files().update(
+                fileId=files[0]['id'],
+                media_body=media,
+                fields='id'
+            ).execute()
+            print(f"Updated existing file in Drive (ID: {file.get('id')})")
+        else:
+            file = drive_service.files().create(
+                body=file_metadata,
+                media_body=media,
+                fields='id'
+            ).execute()
+            print(f"Created new file in Drive (ID: {file.get('id')})")
+    except Exception as e:
+        print(f"Upload failed: {str(e)}")
 
     # Clean up local files
     os.remove('action_prediction.txt')  # Add this to your existing cleanup
@@ -197,8 +198,6 @@ def main():
 
     # After loading the model and tokenizer, add:
     print("Model config:", model.get_config())
-    print("\nTokenizer config:", tokenizer.get_config())
-    print("\nTokenizer word index:", dict(list(tokenizer.word_index.items())[:5]))
     print("\nTokenizer special tokens:", {
         'oov_token': tokenizer.oov_token,
         'word_counts': len(tokenizer.word_counts),
