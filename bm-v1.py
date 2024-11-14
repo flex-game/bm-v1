@@ -9,9 +9,16 @@ from googleapiclient.http import MediaIoBaseDownload
 
 def preprocess_input(text, tokenizer, max_sequence_length):
     """Preprocess the input text for prediction."""
+    # Create main sequence
     sequences = tokenizer.texts_to_sequences([text])
     padded_sequences = pad_sequences(sequences, maxlen=max_sequence_length)
-    return padded_sequences
+    
+    # Create decoder input sequence (shifted target sequence starting with start token)
+    # Assuming start token is index 1 (common practice), adjust if different
+    decoder_input = np.zeros((1, max_sequence_length))
+    decoder_input[:, 0] = 1  # Set start token
+    
+    return [padded_sequences, decoder_input]
 
 def predict_actions(model, input_sequence, tokenizer):
     """Predict actions from the input sequence using the model."""
@@ -136,12 +143,51 @@ def main():
     # Predict actions
     predicted_actions = predict_actions(model, input_sequence, tokenizer)
 
-    # Output the predicted actions
+    # After predicting actions, save and upload them
     print("Predicted Actions:")
-    for actions in predicted_actions:
-        print(actions)
+    with open('action_prediction.txt', 'w') as f:
+        for actions in predicted_actions:
+            print(actions)  # Still print to console
+            f.write(actions + '\n')  # Write to file
 
-    # Clean up downloaded files
+    # Upload prediction file to Google Drive
+    print("Uploading predictions to Google Drive...")
+    drive_service = authenticate_gdrive()
+    
+    file_metadata = {
+        'name': 'action_prediction.txt',
+        'mimeType': 'text/plain'
+    }
+    
+    from googleapiclient.http import MediaFileUpload
+    media = MediaFileUpload('action_prediction.txt', 
+                           mimetype='text/plain',
+                           resumable=True)
+    
+    # Check if file already exists
+    query = "name='action_prediction.txt' and trashed=false"
+    results = drive_service.files().list(q=query).execute()
+    files = results.get('files', [])
+    
+    if files:
+        # Update existing file
+        file = drive_service.files().update(
+            fileId=files[0]['id'],
+            media_body=media,
+            fields='id'
+        ).execute()
+    else:
+        # Create new file
+        file = drive_service.files().create(
+            body=file_metadata,
+            media_body=media,
+            fields='id'
+        ).execute()
+    
+    print(f"Predictions saved to Google Drive with file ID: {file.get('id')}")
+
+    # Clean up local files
+    os.remove('action_prediction.txt')  # Add this to your existing cleanup
     if os.path.exists('model.keras'):
         os.remove('model.keras')
     if os.path.exists('tokenizer.pickle'):
@@ -154,9 +200,10 @@ def main():
     print("\nTokenizer config:", tokenizer.get_config())
     print("\nTokenizer word index:", dict(list(tokenizer.word_index.items())[:5]))
     print("\nTokenizer special tokens:", {
-        'pad_token': tokenizer.pad_token,
-        'start_token': getattr(tokenizer, 'start_token', None),
-        'end_token': getattr(tokenizer, 'end_token', None)
+        'oov_token': tokenizer.oov_token,
+        'word_counts': len(tokenizer.word_counts),
+        'document_count': tokenizer.document_count,
+        'num_words': tokenizer.num_words
     })
 
 if __name__ == "__main__":
