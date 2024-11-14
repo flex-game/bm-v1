@@ -12,7 +12,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 @retry.Retry()
-def extract_txt_files(drive_service, root_folder_id: str, target_folder_name: str) -> List[Dict]:
+def extract_txt_files(drive_service, root_folder_id: str, target_folder_name: str) -> Dict[str, List[Dict]]:
     """
     Extract all .txt files from frame_analysis folders in all training subdirectories.
     
@@ -22,7 +22,7 @@ def extract_txt_files(drive_service, root_folder_id: str, target_folder_name: st
         target_folder_name: Name of target folder (frame_analysis)
     
     Returns:
-        List of dictionaries containing file metadata
+        Dictionary with subfolder names as keys and lists of file metadata as values
     
     Raises:
         FileNotFoundError: If training_data folder is not found
@@ -30,7 +30,7 @@ def extract_txt_files(drive_service, root_folder_id: str, target_folder_name: st
 
     """
 
-    all_txt_files = []
+    all_txt_files = {}
     
     try:
         # Find training_data folder
@@ -74,7 +74,7 @@ def extract_txt_files(drive_service, root_folder_id: str, target_folder_name: st
                 txt_files = list_txt_files(drive_service, frame_analysis_id)
                 
                 if txt_files:
-                    all_txt_files.extend(txt_files)
+                    all_txt_files[subfolder['name']] = txt_files
                     logger.info(f"Added {len(txt_files)} txt files from {subfolder['name']}/{target_folder_name}")
                 else:
                     logger.warning(f"No txt files found in {subfolder['name']}/{target_folder_name}")
@@ -83,7 +83,7 @@ def extract_txt_files(drive_service, root_folder_id: str, target_folder_name: st
                 logger.error(f"Error processing subfolder {subfolder['name']}: {str(e)}")
                 continue
         
-        logger.info(f"Total txt files collected: {len(all_txt_files)}")
+        logger.info(f"Total subfolders with txt files collected: {len(all_txt_files)}")
         return all_txt_files
         
     except FileNotFoundError as e:
@@ -93,32 +93,63 @@ def extract_txt_files(drive_service, root_folder_id: str, target_folder_name: st
         logger.error(f"Unexpected error in extract_txt_files: {str(e)}")
         raise
 
+def sanitize_text_for_csv(text: str) -> str:
+    """
+    Sanitize text for CSV export by removing or replacing problematic characters.
+
+    Args:
+        text: The text content to sanitize.
+
+    Returns:
+        A sanitized version of the text.
+    """
+    # Replace commas with a space or another character to avoid CSV column issues
+    sanitized_text = text.replace(',', ' ')
+    # Optionally, replace newlines with a space or another character
+    sanitized_text = sanitized_text.replace('\n', ' ').replace('\r', ' ')
+    # Handle quotes by escaping them or removing them
+    sanitized_text = sanitized_text.replace('"', '""')
+    return sanitized_text
+
 def compile_to_csv(drive_service, root_folder_id, frame_txt_files, action_txt_files):
-    """Compile .txt files into a CSV and upload it to the root folder."""
+    """Compile .txt files into a single CSV, linking frame and action analysis files."""
+    
     csv_content = []
     
-    # Add headers
-    csv_content.append(['File Name', 'Content'])
+    # Iterate over the keys in the frame_txt_files dictionary
+    for root_folder in frame_txt_files.keys():
+        frame_files = frame_txt_files.get(root_folder, [])
+        action_files = action_txt_files.get(root_folder, [])
+        
+        # Ensure both frame and action files exist for the root folder
+        if frame_files and action_files:
+            logger.info(f"Processing files from root folder: {root_folder}")
+            
+            # Assuming each root folder has a list of files, process them
+            for frame_file, action_file in zip(frame_files, action_files):
+                frame_content = download_file_content(drive_service, frame_file['id'])
+                action_content = download_file_content(drive_service, action_file['id'])
+                
+                # Sanitize the content before adding to CSV
+                sanitized_frame_content = sanitize_text_for_csv(frame_content)
+                sanitized_action_content = sanitize_text_for_csv(action_content)
+                
+                csv_content.append([sanitized_frame_content, sanitized_action_content])
+                logger.info(f"Added files from {root_folder} to CSV content")
     
-    # Add frame analysis files
-    for file in frame_txt_files:
-        file_content = download_file_content(drive_service, file['id'])
-        csv_content.append([file['name'], file_content])
-    
-    # Add action analysis files
-    for file in action_txt_files:
-        file_content = download_file_content(drive_service, file['id'])
-        csv_content.append([file['name'], file_content])
-    
-    # Write to CSV
+    # Write all content to a single CSV
     csv_file_path = 'dataset.csv'
+    logger.info(f"Writing all data to {csv_file_path}")
     with open(csv_file_path, mode='w', newline='', encoding='utf-8') as csv_file:
         writer = csv.writer(csv_file)
+        writer.writerow(['Frame Analysis', 'Action Analysis'])  # Add headers
         writer.writerows(csv_content)
     
     # Upload CSV to root folder
-    upload_text_content(drive_service, root_folder_id, 'dataset.csv', open(csv_file_path, 'r').read())
+    logger.info(f"Uploading {csv_file_path} to Google Drive")
+    upload_text_content(drive_service, root_folder_id, csv_file_path, open(csv_file_path, 'r').read())
     os.remove(csv_file_path)  # Clean up local file
+    logger.info(f"CSV file {csv_file_path} uploaded and local copy removed")
 
 def main():
     root_folder_id = '14rV_AfSINfFyUQgZN4wJEgGtJCyzlv0a'
