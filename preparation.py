@@ -111,5 +111,5 @@ if __name__ == "__main__":
     frames_folder_id = folder_ids['frames']
     analysis_folder_id = folder_ids['frame_analysis']
     actions_folder_id = folder_ids['actions_analysis']
-    system_prompt_path = 'system_prompt.txt'  # Path to the system prompt file
+    system_prompt_path = '/system_prompts/frame_analysis_system_prompt.txt'  # Path to the system prompt file
     process_frames(frames_folder_id, analysis_folder_id, actions_folder_id, system_prompt_path)
