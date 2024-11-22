@@ -76,7 +76,7 @@ def process_frames(frames_folder_id, analysis_folder_id, actions_folder_id, fram
         print(f"Uploading description to frame_analysis folder")
         upload_text_content(drive_service, analysis_folder_id, text_file_name, description)
 
-    # Then, generate action descriptions using the stored frame descriptions
+    # Then, generate action descriptions using only the screenshots
     print("Generating action descriptions...")
     for i in range(28, len(jpg_files) - 1):
         file_name1 = jpg_files[i]['name']
@@ -89,12 +89,8 @@ def process_frames(frames_folder_id, analysis_folder_id, actions_folder_id, fram
         file2_url = get_image_as_base64(drive_service, file_id2)
         
         action_description = generate_action_description(
-            drive_service,
-            analysis_folder_id,
             file1_url,
             file2_url,
-            file_name1,
-            file_name2,
             action_prompt_path
         )
         

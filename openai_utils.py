@@ -62,17 +62,10 @@ def get_text_content(service, folder_id, filename):
     
     return fh.getvalue().decode('utf-8')
 
-def generate_action_description(drive_service, analysis_folder_id, image_url1, image_url2, file_name1, file_name2, prompt_file_path):
+def generate_action_description(image_url1, image_url2, prompt_file_path):
     """Generate a description of the differences between two frames using OpenAI."""
     client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
     system_prompt = load_system_prompt(prompt_file_path)
-    
-    # Get existing frame descriptions from Google Drive
-    text_file_name1 = f"{os.path.splitext(file_name1)[0]}.txt"
-    text_file_name2 = f"{os.path.splitext(file_name2)[0]}.txt"
-    
-    description1 = get_text_content(drive_service, analysis_folder_id, text_file_name1)
-    description2 = get_text_content(drive_service, analysis_folder_id, text_file_name2)
 
     response = client.chat.completions.create(
         model="gpt-4o-mini",
@@ -86,7 +79,7 @@ def generate_action_description(drive_service, analysis_folder_id, image_url1, i
                 "content": [
                     {
                         "type": "text",
-                        "text": f"Analyse these Civ VI screenshots according to the instructions in your system prompt. Return the JSON only."
+                        "text": f"Analyse these two consecutive Civ VI screenshots according to the instructions in your system prompt. Return the JSON only."
                     },
                     {
                         "type": "image_url",
@@ -95,18 +88,10 @@ def generate_action_description(drive_service, analysis_folder_id, image_url1, i
                         }
                     },
                     {
-                        "type": "text",
-                        "text": description1
-                    },
-                    {
                         "type": "image_url",
                         "image_url": {
                             "url": image_url2
                         }
-                    },
-                    {
-                        "type": "text",
-                        "text": description2
                     }
                 ]
             }
