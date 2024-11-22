@@ -26,7 +26,7 @@ The "actions_by_player" attribute:
 
 Each action should have the following format <action_by_player>, where <action_by_player> is similar to the following:
 
-Moved unit <unit_name> from <tile_name> to <tile_name>
+Moved unit <unit_name> <move_description>
 Started building <building_name> in <city_name>
 Started researching <technology_name>
 Started researching <civic_name>
