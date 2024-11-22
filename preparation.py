@@ -52,7 +52,7 @@ def natural_sort_key(file):
     numbers = [int(num) for num in re.findall(r'\d+', name)]
     return numbers  # Returns [1, 1] for frame_1_1, [1, 10] for frame_1_10
 
-def process_frames(frames_folder_id, analysis_folder_id, actions_folder_id, system_prompt_path):
+def process_frames(frames_folder_id, analysis_folder_id, actions_folder_id, frame_prompt_path, action_prompt_path):
     drive_service = authenticate_gdrive()
     jpg_files = list_jpg_files(drive_service, frames_folder_id)
     
@@ -70,7 +70,7 @@ def process_frames(frames_folder_id, analysis_folder_id, actions_folder_id, syst
         print(f"Processing frame: {file_name}")
         
         file_url = get_image_as_base64(drive_service, file_id)
-        description = generate_frame_description(file_url, system_prompt_path)
+        description = generate_frame_description(file_url, frame_prompt_path)
         
         text_file_name = f"{os.path.splitext(file_name)[0]}.txt"
         print(f"Uploading description to frame_analysis folder")
@@ -95,7 +95,7 @@ def process_frames(frames_folder_id, analysis_folder_id, actions_folder_id, syst
             file2_url,
             file_name1,
             file_name2,
-            system_prompt_path
+            action_prompt_path
         )
         
         print(f"Uploading action description to actions_analysis folder")
@@ -111,5 +111,9 @@ if __name__ == "__main__":
     frames_folder_id = folder_ids['frames']
     analysis_folder_id = folder_ids['frame_analysis']
     actions_folder_id = folder_ids['actions_analysis']
-    system_prompt_path = '/system_prompts/frame_analysis_system_prompt.txt'  # Path to the system prompt file
-    process_frames(frames_folder_id, analysis_folder_id, actions_folder_id, system_prompt_path)
+    
+    # Updated system prompt paths
+    frame_prompt_path = 'system_prompts/frame_analysis_system_prompt.txt'
+    action_prompt_path = 'system_prompts/action_analysis_system_prompt.txt'
+    
+    process_frames(frames_folder_id, analysis_folder_id, actions_folder_id, frame_prompt_path, action_prompt_path)
