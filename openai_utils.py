@@ -26,7 +26,7 @@ def generate_frame_description(image_url, prompt_file_path):
                 "content": [
                     {
                         "type": "text",
-                        "text": "Analyse this Civ VI screenshot as instructed in your system prompt. Return the analysis only. Take extra care to precisely describe exactly what you can observe in as much detail as possible, but do not elaborate further into strategic advice."
+                        "text": "Analyse this Civ VI screenshot as instructed in your system prompt. Return the JSON only."
                     },
                     {
                         "type": "image_url",
@@ -86,7 +86,7 @@ def generate_action_description(drive_service, analysis_folder_id, image_url1, i
                 "content": [
                     {
                         "type": "text",
-                        "text": f"These are two Civ VI screenshots and a text description of each one. Create a list of the actions the player must have taken, given the differences between them. Include no information in your response other than the listed actions."  # your existing prompt
+                        "text": f"Analyse these Civ VI screenshots according to the instructions in your system prompt. Return the JSON only."
                     },
                     {
                         "type": "image_url",
