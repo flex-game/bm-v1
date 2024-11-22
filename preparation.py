@@ -63,6 +63,7 @@ def process_frames(frames_folder_id, analysis_folder_id, actions_folder_id, fram
     print(f"Processing {len(jpg_files)} frames...")
 
     # First, generate and upload all frame descriptions
+
     print("Generating frame descriptions...")
     for file in jpg_files:
         file_id = file['id']
