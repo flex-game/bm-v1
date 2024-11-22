@@ -78,7 +78,7 @@ def process_frames(frames_folder_id, analysis_folder_id, actions_folder_id, fram
 
     # Then, generate action descriptions using only the screenshots
     print("Generating action descriptions...")
-    for i in range(28, len(jpg_files) - 1):
+    for i in range(len(jpg_files) - 1):
         file_name1 = jpg_files[i]['name']
         file_name2 = jpg_files[i + 1]['name']
         file_id1 = jpg_files[i]['id']
