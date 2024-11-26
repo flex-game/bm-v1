@@ -7,6 +7,7 @@ import pandas as pd
 from googleapiclient.http import MediaFileUpload
 from googleapiclient.http import MediaIoBaseDownload
 import io
+import sys
 
 logging.basicConfig(
     level=logging.INFO,
@@ -402,45 +403,38 @@ def main():
                         action_files = results.get('files', [])
                         
                         if action_files:
-                            content = download_file_content(drive_service, action_files[0]['id'])
-                            
-                            # Add debug logging
-                            logger.debug(f"Raw content from {subfolder}/action_{image_number}: {repr(content)}")
-                            
-                            try:
-                                # Clean the content
-                                content = content.strip()
-                                if not content:
-                                    logger.warning(f"Empty action file for image {image_number} in {subfolder}")
-                                    continue
-                                
-                                # Try to parse as JSON
+                            for file_info in action_files:
                                 try:
-                                    action_data = json.loads(content)
-                                    image_actions = action_data.get('actions_by_player', [])
-                                except json.JSONDecodeError:
-                                    # If JSON parsing fails, try to extract actions directly from the content
-                                    logger.warning(f"Invalid JSON in {subfolder}/action_{image_number}, attempting direct parsing")
-                                    start_idx = content.find('[')
-                                    end_idx = content.rfind(']')
-                                    if start_idx != -1 and end_idx != -1:
-                                        actions_list = content[start_idx + 1:end_idx]
-                                        image_actions = [action.strip().strip('"\'') for action in actions_list.split(',') if action.strip()]
+                                    filename = file_info['name']
+                                    logging.info(f"Processing file: {filename}")
+                                    
+                                    # Extract the base action number(s) from filename
+                                    # This will handle both 'action_35' and 'action_35_36' formats
+                                    action_nums = filename.replace('action_', '').split('_')
+                                    logging.debug(f"Extracted action numbers: {action_nums}")
+                                    
+                                    content = download_file_content(drive_service, file_info['id'])
+                                    if not content:
+                                        logging.warning(f"No content found for file {filename}")
+                                        continue
+                                        
+                                    actions = parse_action_file_content(content)
+                                    
+                                    if actions:
+                                        # Process the actions, associating them with all relevant action numbers
+                                        for action_num in action_nums:
+                                            # Add to your processing logic here
+                                            pass
                                     else:
-                                        logger.error(f"Could not find action list in file content: {repr(content)}")
+                                        logging.warning(f"No valid actions found in file {filename} ({action_nums})")
+                                    
+                                except KeyboardInterrupt:
+                                    logging.info("\nProcess interrupted by user. Cleaning up...")
+                                    sys.exit(0)
+                                except Exception as e:
+                                    logging.error(f"Error processing file {filename}: {e}")
+                                    logging.debug(f"Full error details:", exc_info=True)
                                     continue
-                                
-                                # Set corresponding actions to 1
-                                for action in image_actions:
-                                    if action in all_actions:
-                                        action_idx = all_actions.index(action)
-                                        action_values[action_idx] = 1
-                                    else:
-                                        logger.warning(f"Unknown action '{action}' found in {subfolder}/action_{image_number}")
-                            
-                            except Exception as e:
-                                logger.error(f"Error processing actions for {subfolder}/action_{image_number}: {str(e)}")
-                                continue
                         else:
                             logger.warning(f"No action file found for image {image_number} in {subfolder}")
             
