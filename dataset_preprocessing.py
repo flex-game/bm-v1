@@ -316,7 +316,7 @@ def main():
         
         # Write data rows
         for i in range(len(image_paths_df)):
-            image_path = image_paths_df.iloc[i]['image_path']
+            image_path = image_paths_df.iloc[i]['image_url']
             stats_shot = stats_df.iloc[i].to_dict() if i < len(stats_df) else {}
             # Initialize all actions as 0 (assuming binary labels)
             action_values = [0] * len(actions_df)
