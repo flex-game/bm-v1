@@ -44,9 +44,24 @@ def compile_unique_actions(drive_service, root_folder_id):
         if actions_analysis_folder_id:
             txt_files = list_txt_files(drive_service, actions_analysis_folder_id)
             for file in txt_files:
-                content = download_file_content(drive_service, file['id'])
-                actions_data = json.loads(content).get("actions_by_player", [])
-                all_actions.update(actions_data)
+                try:
+                    content = download_file_content(drive_service, file['id'])
+                    # Clean the content by removing whitespace and newlines
+                    content = content.strip()
+                    
+                    # Extract the list part between square brackets
+                    start_idx = content.find('[')
+                    end_idx = content.rfind(']')
+                    if start_idx != -1 and end_idx != -1:
+                        actions_list = content[start_idx + 1:end_idx]
+                        # Split by commas and clean up each action
+                        actions = [action.strip().strip('"') for action in actions_list.split(',') if action.strip()]
+                        all_actions.update(actions)
+                    else:
+                        logger.warning(f"Could not find action list in file {file['name']}")
+                except Exception as e:
+                    logger.error(f"Error processing file {file['name']}: {str(e)}")
+                    continue
     
     return list(all_actions)
 
