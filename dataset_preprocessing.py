@@ -3,6 +3,7 @@ import csv
 import json
 import logging
 from gdrive_utils import authenticate_gdrive, list_txt_files, list_jpg_files, download_file_content
+import pandas as pd
 
 logging.basicConfig(
     level=logging.INFO,
@@ -17,14 +18,33 @@ def collect_image_paths(drive_service, frames_folder_id):
     logger.info(f"Collected {len(image_paths)} image paths from frames folder.")
     return image_paths
 
-def collect_stats_shot(drive_service, frame_analysis_folder_id):
+def collect_stats_shot(drive_service, frame_analysis_folder_id, subfolder_name):
     """Collect stats-shot data from frame_analysis folders."""
     txt_files = list_txt_files(drive_service, frame_analysis_folder_id)
     stats_shots = []
     for file in txt_files:
-        content = download_file_content(drive_service, file['id'])
-        stats_shots.append(json.loads(content))
-    logger.info(f"Collected {len(stats_shots)} stats-shot entries from frame_analysis folder.")
+        try:
+            content = download_file_content(drive_service, file['id'])
+            if not content.strip():
+                logger.warning(f"Empty content in file: {file['name']}")
+                continue
+            
+            logger.debug(f"Content from {file['name']}: {content[:100]}...")  # Log first 100 chars
+            stats_shots.append(json.loads(content))
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON parsing error in file {file['name']}: {str(e)}")
+            logger.error(f"Content: {content}")
+            continue
+        except Exception as e:
+            logger.error(f"Error processing file {file['name']}: {str(e)}")
+            continue
+            
+    # Export stats shots to CSV
+    stats_df = pd.DataFrame({'stats_shot': stats_shots})
+    output_file = f'stats_shots_{subfolder_name}.csv'
+    stats_df.to_csv(output_file, index=False)
+    logger.info(f"Exported {len(stats_shots)} stats-shot entries to {output_file}")
+    
     return stats_shots
 
 def compile_unique_actions(drive_service, root_folder_id):
@@ -63,6 +83,11 @@ def compile_unique_actions(drive_service, root_folder_id):
                     logger.error(f"Error processing file {file['name']}: {str(e)}")
                     continue
     
+    # Export actions list to CSV
+    actions_df = pd.DataFrame({'action': list(all_actions)})
+    actions_df.to_csv('unique_actions.csv', index=False)
+    logger.info(f"Exported {len(all_actions)} unique actions to unique_actions.csv")
+    
     return list(all_actions)
 
 def compile_action_labels(drive_service, actions_analysis_folder_id, all_actions, image_index):
@@ -95,6 +120,9 @@ def main():
     results = drive_service.files().list(q=query, spaces='drive', fields='files(id, name)').execute()
     subfolders = results.get('files', [])
     
+    # Create separate files for each subfolder
+    subfolder_data = []
+    
     for subfolder in subfolders:
         logger.info(f"Processing subfolder: {subfolder['name']}")
         
@@ -109,16 +137,37 @@ def main():
         
         if frames_folder_id and frame_analysis_folder_id and actions_analysis_folder_id:
             image_paths = collect_image_paths(drive_service, frames_folder_id)
-            stats_shots = collect_stats_shot(drive_service, frame_analysis_folder_id)
+            stats_shots = collect_stats_shot(drive_service, frame_analysis_folder_id, subfolder['name'])
             
-            csv_file_path = 'dataset.csv'
-            with open(csv_file_path, mode='a', newline='', encoding='utf-8') as csv_file:
-                writer = csv.writer(csv_file)
-                for index, (image_path, stats_shot) in enumerate(zip(image_paths, stats_shots), start=1):
-                    action_labels = compile_action_labels(drive_service, actions_analysis_folder_id, all_actions, index)
-                    writer.writerow([image_path, json.dumps(stats_shot)] + action_labels)
+            # Store data for this subfolder
+            subfolder_data.append({
+                'name': subfolder['name'],
+                'image_paths': image_paths,
+                'stats_shots': stats_shots,
+                'actions_analysis_folder_id': actions_analysis_folder_id
+            })
         else:
             logger.warning(f"Missing required folders in subfolder: {subfolder['name']}")
+
+    # Combine all data into final dataset
+    logger.info("Combining all data into final dataset...")
+    with open('dataset.csv', mode='w', newline='', encoding='utf-8') as csv_file:
+        writer = csv.writer(csv_file)
+        # Write header
+        writer.writerow(['image_path', 'stats_shot'] + all_actions)
+        
+        # Write data from each subfolder
+        for data in subfolder_data:
+            for index, (image_path, stats_shot) in enumerate(zip(data['image_paths'], data['stats_shots']), start=1):
+                action_labels = compile_action_labels(
+                    drive_service, 
+                    data['actions_analysis_folder_id'], 
+                    all_actions, 
+                    index
+                )
+                writer.writerow([image_path, json.dumps(stats_shot)] + action_labels)
+
+    logger.info("Dataset compilation complete!")
 
 if __name__ == "__main__":
     main() 
