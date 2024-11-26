@@ -132,15 +132,24 @@ def compile_action_labels(file_path):
         logging.error(f"File not found: {file_path}")
         return []
 
+def check_file_in_drive(drive_service, folder_id, filename):
+    """Check if file exists in Google Drive folder and return file ID if found."""
+    query = f"name='{filename}' and '{folder_id}' in parents and trashed=false"
+    results = drive_service.files().list(q=query, fields='files(id, name)').execute()
+    files = results.get('files', [])
+    
+    if files:
+        logger.info(f"Found existing {filename} in Drive")
+        return files[0]['id']
+    return None
+
 def upload_to_drive(drive_service, file_path, folder_id, file_name=None):
-    """Upload a file to Google Drive."""
+    """Upload a file to Google Drive, replacing if it already exists."""
     if file_name is None:
         file_name = os.path.basename(file_path)
     
-    file_metadata = {
-        'name': file_name,
-        'parents': [folder_id]
-    }
+    # Check if file already exists
+    existing_file_id = check_file_in_drive(drive_service, folder_id, file_name)
     
     media = MediaFileUpload(
         file_path,
@@ -148,36 +157,28 @@ def upload_to_drive(drive_service, file_path, folder_id, file_name=None):
         resumable=True
     )
     
-    file = drive_service.files().create(
-        body=file_metadata,
-        media_body=media,
-        fields='id'
-    ).execute()
+    if existing_file_id:
+        # Update existing file
+        file = drive_service.files().update(
+            fileId=existing_file_id,
+            media_body=media,
+            fields='id'
+        ).execute()
+        logger.info(f"Updated existing {file_name} in Drive with ID: {file.get('id')}")
+    else:
+        # Create new file
+        file_metadata = {
+            'name': file_name,
+            'parents': [folder_id]
+        }
+        file = drive_service.files().create(
+            body=file_metadata,
+            media_body=media,
+            fields='id'
+        ).execute()
+        logger.info(f"Uploaded new {file_name} to Drive with ID: {file.get('id')}")
     
-    logger.info(f"Uploaded {file_name} to Drive with ID: {file.get('id')}")
     return file.get('id')
-
-def check_file_in_drive(drive_service, folder_id, filename):
-    """Check if file exists in Google Drive folder and download if found."""
-    query = f"name='{filename}' and '{folder_id}' in parents and trashed=false"
-    results = drive_service.files().list(q=query, fields='files(id, name)').execute()
-    files = results.get('files', [])
-    
-    if files:
-        logger.info(f"Found {filename} in Drive, downloading...")
-        file_id = files[0]['id']
-        request = drive_service.files().get_media(fileId=file_id)
-        fh = io.BytesIO()
-        downloader = MediaIoBaseDownload(fh, request)
-        done = False
-        while done is False:
-            status, done = downloader.next_chunk()
-        
-        # Save to local file
-        with open(filename, 'wb') as f:
-            f.write(fh.getvalue())
-        return True
-    return False
 
 def main():
     root_folder_id = '1BdyuWOoHuoeirHS7GwuMe77V3Cd35i_m'
@@ -304,7 +305,7 @@ def main():
     
     # Clean up local files
     logger.info("Cleaning up local files...")
-    for file in ['unique_actions.csv', 'all_stats_shots.csv', 'dataset.csv']:
+    for file in ['unique_actions.csv', 'all_stats_shots.csv', 'dataset.csv', 'image_paths.csv']:
         try:
             if os.path.exists(file):
                 os.remove(file)
