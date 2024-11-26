@@ -108,20 +108,20 @@ def compile_unique_actions(drive_service, root_folder_id):
     
     return list(all_actions)
 
-def compile_action_labels(drive_service, actions_analysis_folder_id, all_actions, image_index):
-    """Compile binary action labels from actions_analysis folders."""
-    txt_files = list_txt_files(drive_service, actions_analysis_folder_id)
-    action_labels = [0] * len(all_actions)
-    for file in txt_files:
-        filename = file['name']
-        if filename.startswith(f"action_{image_index}_"):
-            content = download_file_content(drive_service, file['id'])
-            actions_data = json.loads(content).get("actions_by_player", [])
-            for action in actions_data:
-                if action in all_actions:
-                    action_labels[all_actions.index(action)] = 1
-    logger.info(f"Compiled action labels for image index {image_index}.")
-    return action_labels
+def compile_action_labels(file_path):
+    logging.info(f"Reading actions from CSV: {file_path}")
+    try:
+        # Read from CSV instead of JSON
+        actions_data = []
+        with open(file_path, 'r') as f:
+            csv_reader = csv.reader(f)
+            # Skip header if it exists
+            next(csv_reader, None)
+            actions_data = [row[0] for row in csv_reader]  # Assuming actions are in first column
+        return actions_data
+    except FileNotFoundError:
+        logging.error(f"File not found: {file_path}")
+        return []
 
 def upload_to_drive(drive_service, file_path, folder_id, file_name=None):
     """Upload a file to Google Drive."""
