@@ -194,6 +194,48 @@ def download_file_from_drive(drive_service, file_id, filename):
         f.write(fh.read())
     logger.info(f"Downloaded {filename} from Drive")
 
+def parse_action_file_content(content):
+    """
+    Parse the action file content, handling both JSON and direct text formats
+    Returns the list of actions or None if parsing fails
+    """
+    try:
+        # First attempt: try to parse as JSON
+        data = json.loads(content)
+        if 'actions_by_player' in data:
+            return data['actions_by_player']
+    except json.JSONDecodeError:
+        # Second attempt: try to parse the content directly
+        try:
+            # Look for the actions_by_player list using string manipulation
+            start_marker = '"actions_by_player": ['
+            end_marker = ']'
+            
+            start_idx = content.find(start_marker)
+            if start_idx == -1:
+                return None
+                
+            start_idx += len(start_marker)
+            end_idx = content.find(end_marker, start_idx)
+            
+            if end_idx == -1:
+                return None
+                
+            actions_str = content[start_idx:end_idx]
+            # Split by commas and clean up the strings
+            actions = [
+                action.strip().strip('"') 
+                for action in actions_str.split('",')
+                if action.strip()
+            ]
+            return actions
+            
+        except Exception as e:
+            logging.warning(f"Failed to parse file content directly: {e}")
+            return None
+    
+    return None
+
 def main():
     root_folder_id = '1BdyuWOoHuoeirHS7GwuMe77V3Cd35i_m'
     drive_service = authenticate_gdrive()
