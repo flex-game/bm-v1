@@ -4,6 +4,7 @@ import json
 import logging
 from gdrive_utils import authenticate_gdrive, list_txt_files, list_jpg_files, download_file_content
 import pandas as pd
+from googleapiclient.http import MediaFileUpload
 
 logging.basicConfig(
     level=logging.INFO,
@@ -22,6 +23,7 @@ def collect_stats_shot(drive_service, frame_analysis_folder_id, subfolder_name):
     """Collect stats-shot data from frame_analysis folders."""
     txt_files = list_txt_files(drive_service, frame_analysis_folder_id)
     stats_shots = []
+    
     for file in txt_files:
         try:
             content = download_file_content(drive_service, file['id'])
@@ -29,8 +31,11 @@ def collect_stats_shot(drive_service, frame_analysis_folder_id, subfolder_name):
                 logger.warning(f"Empty content in file: {file['name']}")
                 continue
             
-            logger.debug(f"Content from {file['name']}: {content[:100]}...")  # Log first 100 chars
-            stats_shots.append(json.loads(content))
+            logger.debug(f"Content from {file['name']}: {content[:100]}...")
+            stats_shot = json.loads(content)
+            # Add subfolder name to track source
+            stats_shot['subfolder'] = subfolder_name
+            stats_shots.append(stats_shot)
         except json.JSONDecodeError as e:
             logger.error(f"JSON parsing error in file {file['name']}: {str(e)}")
             logger.error(f"Content: {content}")
@@ -38,13 +43,8 @@ def collect_stats_shot(drive_service, frame_analysis_folder_id, subfolder_name):
         except Exception as e:
             logger.error(f"Error processing file {file['name']}: {str(e)}")
             continue
-            
-    # Export stats shots to CSV
-    stats_df = pd.DataFrame({'stats_shot': stats_shots})
-    output_file = f'stats_shots_{subfolder_name}.csv'
-    stats_df.to_csv(output_file, index=False)
-    logger.info(f"Exported {len(stats_shots)} stats-shot entries to {output_file}")
     
+    logger.info(f"Collected {len(stats_shots)} stats-shot entries from {subfolder_name}")
     return stats_shots
 
 def compile_unique_actions(drive_service, root_folder_id):
@@ -105,6 +105,31 @@ def compile_action_labels(drive_service, actions_analysis_folder_id, all_actions
     logger.info(f"Compiled action labels for image index {image_index}.")
     return action_labels
 
+def upload_to_drive(drive_service, file_path, folder_id, file_name=None):
+    """Upload a file to Google Drive."""
+    if file_name is None:
+        file_name = os.path.basename(file_path)
+    
+    file_metadata = {
+        'name': file_name,
+        'parents': [folder_id]
+    }
+    
+    media = MediaFileUpload(
+        file_path,
+        mimetype='text/csv',
+        resumable=True
+    )
+    
+    file = drive_service.files().create(
+        body=file_metadata,
+        media_body=media,
+        fields='id'
+    ).execute()
+    
+    logger.info(f"Uploaded {file_name} to Drive with ID: {file.get('id')}")
+    return file.get('id')
+
 def main():
     root_folder_id = '1BdyuWOoHuoeirHS7GwuMe77V3Cd35i_m'
     drive_service = authenticate_gdrive()
@@ -114,6 +139,9 @@ def main():
     # Compile all unique actions
     all_actions = compile_unique_actions(drive_service, root_folder_id)
     logger.info(f"Total unique actions found: {len(all_actions)}")
+    
+    # Store all stats shots across all subfolders
+    all_stats_shots = []
     
     # Iterate over each subdirectory in the root folder
     query = f"'{root_folder_id}' in parents and mimeType='application/vnd.google-apps.folder'"
@@ -138,6 +166,7 @@ def main():
         if frames_folder_id and frame_analysis_folder_id and actions_analysis_folder_id:
             image_paths = collect_image_paths(drive_service, frames_folder_id)
             stats_shots = collect_stats_shot(drive_service, frame_analysis_folder_id, subfolder['name'])
+            all_stats_shots.extend(stats_shots)
             
             # Store data for this subfolder
             subfolder_data.append({
@@ -149,23 +178,25 @@ def main():
         else:
             logger.warning(f"Missing required folders in subfolder: {subfolder['name']}")
 
-    # Combine all data into final dataset
-    logger.info("Combining all data into final dataset...")
-    with open('dataset.csv', mode='w', newline='', encoding='utf-8') as csv_file:
-        writer = csv.writer(csv_file)
-        # Write header
-        writer.writerow(['image_path', 'stats_shot'] + all_actions)
-        
-        # Write data from each subfolder
-        for data in subfolder_data:
-            for index, (image_path, stats_shot) in enumerate(zip(data['image_paths'], data['stats_shots']), start=1):
-                action_labels = compile_action_labels(
-                    drive_service, 
-                    data['actions_analysis_folder_id'], 
-                    all_actions, 
-                    index
-                )
-                writer.writerow([image_path, json.dumps(stats_shot)] + action_labels)
+    # Export combined stats shots
+    logger.info(f"Exporting {len(all_stats_shots)} total stats shots...")
+    stats_df = pd.DataFrame(all_stats_shots)
+    stats_df.to_csv('all_stats_shots.csv', index=False)
+    
+    # Upload files to Drive
+    logger.info("Uploading files to Google Drive...")
+    upload_to_drive(drive_service, 'unique_actions.csv', root_folder_id)
+    upload_to_drive(drive_service, 'all_stats_shots.csv', root_folder_id)
+    upload_to_drive(drive_service, 'dataset.csv', root_folder_id)
+    
+    # Clean up local files
+    logger.info("Cleaning up local files...")
+    for file in ['unique_actions.csv', 'all_stats_shots.csv', 'dataset.csv']:
+        try:
+            os.remove(file)
+            logger.info(f"Removed {file}")
+        except Exception as e:
+            logger.warning(f"Could not remove {file}: {str(e)}")
 
     logger.info("Dataset compilation complete!")
 
