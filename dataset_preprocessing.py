@@ -254,30 +254,33 @@ def main():
     results = drive_service.files().list(q=query, spaces='drive', fields='files(id, name)').execute()
     subfolders = results.get('files', [])
     
-    # Get the frames folder ID from the first subfolder (assuming consistent structure)
-    if subfolders:
-        subfolder_id = subfolders[0]['id']
+    image_paths = []
+    for subfolder in subfolders:
+        subfolder_id = subfolder['id']
         query = f"'{subfolder_id}' in parents and mimeType='application/vnd.google-apps.folder'"
         results = drive_service.files().list(q=query, spaces='drive', fields='files(id, name)').execute()
         folders = {folder['name']: folder['id'] for folder in results.get('files', [])}
         
         frames_folder_id = folders.get('frames')
         if frames_folder_id:
-            image_paths = collect_image_paths(drive_service, frames_folder_id)
+            subfolder_images = collect_image_paths(drive_service, frames_folder_id)
+            image_paths.extend(subfolder_images)
+            logger.info(f"Added {len(subfolder_images)} images from subfolder {subfolder['name']}")
         else:
-            logger.error("Could not find frames folder")
-            image_paths = []
-    else:
-        logger.error("No subfolders found")
-        image_paths = []
+            logger.warning(f"Could not find frames folder in subfolder {subfolder['name']}")
+
+    logger.info(f"Total images collected: {len(image_paths)}")
 
     # Before exporting image paths
     image_paths_file = 'image_paths.csv'
     
     # Check if file already exists in Drive
     try:
-        if check_file_in_drive(drive_service, root_folder_id, image_paths_file):
+        file_id = check_file_in_drive(drive_service, root_folder_id, image_paths_file)
+        if file_id:
             logging.info(f"{image_paths_file} already exists in Drive, downloading...")
+            # Download the file first
+            download_file_from_drive(drive_service, file_id, image_paths_file)
             logging.info("Using existing image paths file")
             with open(image_paths_file, 'r') as f:
                 csv_reader = csv.reader(f)
