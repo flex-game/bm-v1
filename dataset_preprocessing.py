@@ -362,10 +362,31 @@ def main():
                         if action_files:
                             content = download_file_content(drive_service, action_files[0]['id'])
                             
+                            # Add debug logging
+                            logger.debug(f"Raw content from {subfolder}/action_{image_number}: {repr(content)}")
+                            
                             try:
-                                # Parse the JSON content
-                                action_data = json.loads(content)
-                                image_actions = action_data.get('actions_by_player', [])
+                                # Clean the content
+                                content = content.strip()
+                                if not content:
+                                    logger.warning(f"Empty action file for image {image_number} in {subfolder}")
+                                    continue
+                                
+                                # Try to parse as JSON
+                                try:
+                                    action_data = json.loads(content)
+                                    image_actions = action_data.get('actions_by_player', [])
+                                except json.JSONDecodeError:
+                                    # If JSON parsing fails, try to extract actions directly from the content
+                                    logger.warning(f"Invalid JSON in {subfolder}/action_{image_number}, attempting direct parsing")
+                                    start_idx = content.find('[')
+                                    end_idx = content.rfind(']')
+                                    if start_idx != -1 and end_idx != -1:
+                                        actions_list = content[start_idx + 1:end_idx]
+                                        image_actions = [action.strip().strip('"\'') for action in actions_list.split(',') if action.strip()]
+                                    else:
+                                        logger.error(f"Could not find action list in file content: {repr(content)}")
+                                    continue
                                 
                                 # Set corresponding actions to 1
                                 for action in image_actions:
@@ -373,10 +394,11 @@ def main():
                                         action_idx = all_actions.index(action)
                                         action_values[action_idx] = 1
                                     else:
-                                        logger.warning(f"Unknown action '{action}' found in {subfolder}/action_{image_number}_*.txt")
+                                        logger.warning(f"Unknown action '{action}' found in {subfolder}/action_{image_number}")
                             
-                            except json.JSONDecodeError as e:
-                                logger.error(f"JSON parsing error in {subfolder}/action_{image_number}_*.txt: {str(e)}")
+                            except Exception as e:
+                                logger.error(f"Error processing actions for {subfolder}/action_{image_number}: {str(e)}")
+                                continue
                         else:
                             logger.warning(f"No action file found for image {image_number} in {subfolder}")
             
