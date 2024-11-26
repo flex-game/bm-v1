@@ -27,24 +27,40 @@ def collect_stats_shot(drive_service, frame_analysis_folder_id, subfolder_name):
     for file in txt_files:
         try:
             content = download_file_content(drive_service, file['id'])
-            if not content.strip():
+            
+            # Clean the content
+            content = content.strip()
+            if not content:
                 logger.warning(f"Empty content in file: {file['name']}")
                 continue
+                
+            # Remove any markdown code block markers if present
+            if content.startswith('```') and content.endswith('```'):
+                content = content[content.find('{'):content.rfind('}')+1]
             
-            logger.debug(f"Content from {file['name']}: {content[:100]}...")
+            logger.debug(f"Processing content from {file['name']}: {content[:100]}...")
             stats_shot = json.loads(content)
-            # Add subfolder name to track source
+            
+            # Validate the parsed JSON has expected fields
+            if not isinstance(stats_shot, dict):
+                logger.warning(f"Unexpected JSON structure in {file['name']}: not a dictionary")
+                continue
+                
+            # Add metadata
             stats_shot['subfolder'] = subfolder_name
+            stats_shot['filename'] = file['name']
+            
             stats_shots.append(stats_shot)
+            
         except json.JSONDecodeError as e:
             logger.error(f"JSON parsing error in file {file['name']}: {str(e)}")
-            logger.error(f"Content: {content}")
+            logger.error(f"Raw content: {content}")
             continue
         except Exception as e:
             logger.error(f"Error processing file {file['name']}: {str(e)}")
             continue
     
-    logger.info(f"Collected {len(stats_shots)} stats-shot entries from {subfolder_name}")
+    logger.info(f"Collected {len(stats_shots)} valid stats-shot entries from {subfolder_name}")
     return stats_shots
 
 def compile_unique_actions(drive_service, root_folder_id):
