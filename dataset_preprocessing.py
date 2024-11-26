@@ -315,19 +315,77 @@ def main():
     stats_df = pd.read_csv('all_stats_shots.csv')
     image_paths_df = pd.read_csv('image_urls.csv')
     actions_df = pd.read_csv('unique_actions.csv')
+    all_actions = actions_df['action'].tolist()
     
     with open('dataset.csv', mode='w', newline='', encoding='utf-8') as csv_file:
         writer = csv.writer(csv_file)
         # Header row: image_path, stats_shot, followed by all action columns
-        writer.writerow(['image_path', 'stats_shot'] + actions_df['action'].tolist())
+        writer.writerow(['image_path', 'stats_shot'] + all_actions)
         
         # Write data rows
         for i in range(len(image_paths_df)):
             image_path = image_paths_df.iloc[i]['image_url']
             stats_shot = stats_df.iloc[i].to_dict() if i < len(stats_df) else {}
-            # Initialize all actions as 0 (assuming binary labels)
-            action_values = [0] * len(actions_df)
+            
+            # Get the subfolder name from the stats_shot
+            subfolder = stats_shot.get('subfolder', '')
+            
+            # Initialize all actions as 0
+            action_values = [0] * len(all_actions)
+            
+            try:
+                # Extract image number from the URL (e.g., "14.jpg" -> "14")
+                image_number = image_path.split('/')[-1].split('.')[0]
+                
+                # Get subfolder ID
+                query = f"name='{subfolder}' and '{root_folder_id}' in parents"
+                results = drive_service.files().list(q=query, fields='files(id)').execute()
+                subfolder_files = results.get('files', [])
+                
+                if subfolder_files:
+                    subfolder_id = subfolder_files[0]['id']
+                    
+                    # Get actions_analysis folder ID
+                    query = f"name='actions_analysis' and '{subfolder_id}' in parents"
+                    results = drive_service.files().list(q=query, fields='files(id)').execute()
+                    actions_folder = results.get('files', [])
+                    
+                    if actions_folder:
+                        actions_folder_id = actions_folder[0]['id']
+                        
+                        # Look for action_{image_number}_*.txt files
+                        query = f"name contains 'action_{image_number}_' and name ends with '.txt' and '{actions_folder_id}' in parents"
+                        results = drive_service.files().list(q=query, fields='files(id)').execute()
+                        action_files = results.get('files', [])
+                        
+                        if action_files:
+                            content = download_file_content(drive_service, action_files[0]['id'])
+                            
+                            try:
+                                # Parse the JSON content
+                                action_data = json.loads(content)
+                                image_actions = action_data.get('actions_by_player', [])
+                                
+                                # Set corresponding actions to 1
+                                for action in image_actions:
+                                    if action in all_actions:
+                                        action_idx = all_actions.index(action)
+                                        action_values[action_idx] = 1
+                                    else:
+                                        logger.warning(f"Unknown action '{action}' found in {subfolder}/action_{image_number}_*.txt")
+                            
+                            except json.JSONDecodeError as e:
+                                logger.error(f"JSON parsing error in {subfolder}/action_{image_number}_*.txt: {str(e)}")
+                        else:
+                            logger.warning(f"No action file found for image {image_number} in {subfolder}")
+            
+            except Exception as e:
+                logger.warning(f"Error processing actions for image {image_path}: {str(e)}")
+            
             writer.writerow([image_path, json.dumps(stats_shot)] + action_values)
+            
+            if i % 50 == 0:  # Log progress every 50 images
+                logger.info(f"Processed {i}/{len(image_paths_df)} images")
     
     # Upload files to Drive only after all files are created
     logger.info("Uploading files to Google Drive...")
