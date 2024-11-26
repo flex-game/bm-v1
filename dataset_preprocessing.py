@@ -199,18 +199,39 @@ def main():
     stats_df = pd.DataFrame(all_stats_shots)
     stats_df.to_csv('all_stats_shots.csv', index=False)
     
-    # Upload files to Drive
+    # Create the final dataset.csv
+    logger.info("Creating final dataset.csv...")
+    with open('dataset.csv', mode='w', newline='', encoding='utf-8') as csv_file:
+        writer = csv.writer(csv_file)
+        # Write header
+        writer.writerow(['image_path', 'stats_shot'] + all_actions)
+        
+        # Write data from each subfolder
+        for data in subfolder_data:
+            for index, (image_path, stats_shot) in enumerate(zip(data['image_paths'], data['stats_shots']), start=1):
+                action_labels = compile_action_labels(
+                    drive_service, 
+                    data['actions_analysis_folder_id'], 
+                    all_actions, 
+                    index
+                )
+                writer.writerow([image_path, json.dumps(stats_shot)] + action_labels)
+    
+    # Upload files to Drive only after all files are created
     logger.info("Uploading files to Google Drive...")
-    upload_to_drive(drive_service, 'unique_actions.csv', root_folder_id)
-    upload_to_drive(drive_service, 'all_stats_shots.csv', root_folder_id)
-    upload_to_drive(drive_service, 'dataset.csv', root_folder_id)
+    for file_name in ['unique_actions.csv', 'all_stats_shots.csv', 'dataset.csv']:
+        if os.path.exists(file_name):
+            upload_to_drive(drive_service, file_name, root_folder_id)
+        else:
+            logger.warning(f"File {file_name} not found, skipping upload")
     
     # Clean up local files
     logger.info("Cleaning up local files...")
     for file in ['unique_actions.csv', 'all_stats_shots.csv', 'dataset.csv']:
         try:
-            os.remove(file)
-            logger.info(f"Removed {file}")
+            if os.path.exists(file):
+                os.remove(file)
+                logger.info(f"Removed {file}")
         except Exception as e:
             logger.warning(f"Could not remove {file}: {str(e)}")
 
