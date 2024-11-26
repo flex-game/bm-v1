@@ -378,7 +378,8 @@ def main():
             
             try:
                 # Get the file name from the Drive file ID
-                file_metadata = drive_service.files().get(fileId=image_path.split('id=')[1], fields='name').execute()
+                file_id = image_path.split('id=')[1]
+                file_metadata = drive_service.files().get(fileId=file_id, fields='name').execute()
                 image_number = file_metadata['name'].split('.')[0]  # Get number from actual filename
                 
                 # Get subfolder ID
@@ -402,41 +403,36 @@ def main():
                         results = drive_service.files().list(q=query, fields='files(id)').execute()
                         action_files = results.get('files', [])
                         
-                        if action_files:
-                            for file_info in action_files:
-                                try:
-                                    filename = file_info['name']
-                                    logging.info(f"Processing file: {filename}")
-                                    
-                                    # Extract the base action number(s) from filename
-                                    # This will handle both 'action_35' and 'action_35_36' formats
-                                    action_nums = filename.replace('action_', '').split('_')
-                                    logging.debug(f"Extracted action numbers: {action_nums}")
-                                    
-                                    content = download_file_content(drive_service, file_info['id'])
-                                    if not content:
-                                        logging.warning(f"No content found for file {filename}")
-                                        continue
-                                        
-                                    actions = parse_action_file_content(content)
-                                    
-                                    if actions:
-                                        # Process the actions, associating them with all relevant action numbers
-                                        for action_num in action_nums:
-                                            # Add to your processing logic here
-                                            pass
-                                    else:
-                                        logging.warning(f"No valid actions found in file {filename} ({action_nums})")
-                                    
-                                except KeyboardInterrupt:
-                                    logging.info("\nProcess interrupted by user. Cleaning up...")
-                                    sys.exit(0)
-                                except Exception as e:
-                                    logging.error(f"Error processing file {filename}: {e}")
-                                    logging.debug(f"Full error details:", exc_info=True)
+                        for file_info in action_files:
+                            try:
+                                filename = file_info['name']
+                                logging.info(f"Processing file: {filename}")
+                                
+                                # Extract the base action number(s) from filename
+                                # This will handle both 'action_35' and 'action_35_36' formats
+                                action_nums = filename.replace('action_', '').split('_')
+                                logging.debug(f"Extracted action numbers: {action_nums}")
+                                
+                                content = download_file_content(drive_service, file_info['id'])
+                                if not content:
+                                    logging.warning(f"No content found for file {filename}")
                                     continue
-                        else:
-                            logger.warning(f"No action file found for image {image_number} in {subfolder}")
+                                        
+                                actions = parse_action_file_content(content)
+                                
+                                if actions:
+                                    # Process the actions, associating them with all relevant action numbers
+                                    for action_num in action_nums:
+                                        # Add to your processing logic here
+                                        pass
+                                else:
+                                    logging.warning(f"No valid actions found in file {filename} ({action_nums})")
+                                
+                            except Exception as e:
+                                logging.error(f"Error processing action file: {str(e)}")
+                                continue
+                    else:
+                        logger.warning(f"No action file found for image {image_number} in {subfolder}")
             
             except Exception as e:
                 logger.warning(f"Error processing actions for image {image_path}: {str(e)}")
