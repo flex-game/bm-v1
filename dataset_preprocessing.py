@@ -437,8 +437,14 @@ def main():
                                 if actions:
                                     # Process the actions, associating them with all relevant action numbers
                                     for action_num in action_nums:
-                                        # Add to your processing logic here
-                                        pass
+                                        try:
+                                            # Convert action_num to int and find its index in all_actions
+                                            action_index = all_actions.index(f"action_{action_num}")
+                                            action_values[action_index] = 1
+                                            logging.debug(f"Set action_{action_num} to 1")
+                                        except ValueError as e:
+                                            logging.warning(f"Action number {action_num} not found in all_actions list")
+                                            continue
                                 else:
                                     logging.warning(f"No valid actions found in file {filename} ({action_nums})")
                                 
