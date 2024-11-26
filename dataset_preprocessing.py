@@ -258,7 +258,7 @@ def main():
                     writer.writerow([path])
             
             # Upload to Google Drive
-            upload_to_drive(image_paths_file, 'image_paths.csv')
+            upload_to_drive(drive_service, image_paths_file, root_folder_id, 'image_paths.csv')
             logging.info(f"Successfully uploaded {image_paths_file} to Google Drive")
     except Exception as e:
         logging.error(f"Error handling image paths file: {str(e)}")
