@@ -400,7 +400,10 @@ def main():
                         
                         # Look for action files with the correct image number
                         query = f"name contains 'action_{image_number}_' and mimeType='text/plain' and '{actions_folder_id}' in parents"
-                        results = drive_service.files().list(q=query, fields='files(id)').execute()
+                        results = drive_service.files().list(
+                            q=query, 
+                            fields='files(id, name)'
+                        ).execute()
                         action_files = results.get('files', [])
                         
                         for file_info in action_files:
