@@ -250,63 +250,70 @@ def main():
     
     # Add this section to collect image paths
     logger.info("Collecting image paths...")
-    query = f"'{root_folder_id}' in parents and mimeType='application/vnd.google-apps.folder'"
-    results = drive_service.files().list(q=query, spaces='drive', fields='files(id, name)').execute()
-    subfolders = results.get('files', [])
     
+    # Check for existing image_urls.csv first
+    image_urls_file = 'image_urls.csv'
     image_paths = []
-    for subfolder in subfolders:
-        subfolder_id = subfolder['id']
-        query = f"'{subfolder_id}' in parents and mimeType='application/vnd.google-apps.folder'"
-        results = drive_service.files().list(q=query, spaces='drive', fields='files(id, name)').execute()
-        folders = {folder['name']: folder['id'] for folder in results.get('files', [])}
-        
-        frames_folder_id = folders.get('frames')
-        if frames_folder_id:
-            subfolder_images = collect_image_paths(drive_service, frames_folder_id)
-            image_paths.extend(subfolder_images)
-            logger.info(f"Added {len(subfolder_images)} images from subfolder {subfolder['name']}")
-        else:
-            logger.warning(f"Could not find frames folder in subfolder {subfolder['name']}")
-
-    logger.info(f"Total images collected: {len(image_paths)}")
-
-    # Before exporting image paths
-    image_paths_file = 'image_paths.csv'
     
-    # Check if file already exists in Drive
-    try:
-        file_id = check_file_in_drive(drive_service, root_folder_id, image_paths_file)
-        if file_id:
-            logging.info(f"{image_paths_file} already exists in Drive, downloading...")
-            # Download the file first
-            download_file_from_drive(drive_service, file_id, image_paths_file)
-            logging.info("Using existing image paths file")
-            with open(image_paths_file, 'r') as f:
+    # Check for file in Drive and locally
+    file_id = check_file_in_drive(drive_service, root_folder_id, image_urls_file)
+    if file_id or os.path.exists(image_urls_file):
+        logger.info("Found existing image_urls.csv, loading paths...")
+        try:
+            # Download the file if it exists in Drive but not locally
+            if file_id and not os.path.exists(image_urls_file):
+                download_file_from_drive(drive_service, file_id, image_urls_file)
+            
+            # Read the existing paths
+            with open(image_urls_file, 'r') as f:
                 csv_reader = csv.reader(f)
                 next(csv_reader)  # Skip header
                 image_paths = [row[0] for row in csv_reader]
-        else:
-            logging.info(f"Exporting {len(image_paths)} image paths to CSV...")
-            with open(image_paths_file, 'w', newline='') as f:
-                writer = csv.writer(f)
-                writer.writerow(['image_url'])  # Changed header to reflect URL nature
-                for url in image_paths:
-                    writer.writerow([url])
+            logger.info(f"Loaded {len(image_paths)} image paths from existing file")
+        except Exception as e:
+            logger.error(f"Error loading image_urls.csv: {e}")
+            logger.info("Falling back to collecting image paths from Drive...")
+            image_paths = []
+    
+    # Only collect paths if we don't have them already
+    if not image_paths:
+        query = f"'{root_folder_id}' in parents and mimeType='application/vnd.google-apps.folder'"
+        results = drive_service.files().list(q=query, spaces='drive', fields='files(id, name)').execute()
+        subfolders = results.get('files', [])
+        
+        for subfolder in subfolders:
+            subfolder_id = subfolder['id']
+            query = f"'{subfolder_id}' in parents and mimeType='application/vnd.google-apps.folder'"
+            results = drive_service.files().list(q=query, spaces='drive', fields='files(id, name)').execute()
+            folders = {folder['name']: folder['id'] for folder in results.get('files', [])}
             
-            # Upload to Google Drive
-            upload_to_drive(drive_service, image_paths_file, root_folder_id, 'image_paths.csv')
-            logging.info(f"Successfully uploaded {image_paths_file} to Google Drive")
-    except Exception as e:
-        logging.error(f"Error handling image paths file: {str(e)}")
-        raise
+            frames_folder_id = folders.get('frames')
+            if frames_folder_id:
+                subfolder_images = collect_image_paths(drive_service, frames_folder_id)
+                image_paths.extend(subfolder_images)
+                logger.info(f"Added {len(subfolder_images)} images from subfolder {subfolder['name']}")
+            else:
+                logger.warning(f"Could not find frames folder in subfolder {subfolder['name']}")
+
+        logger.info(f"Total images collected: {len(image_paths)}")
+
+        # Save the newly collected paths
+        with open(image_urls_file, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(['image_url'])
+            for url in image_paths:
+                writer.writerow([url])
+        
+        # Upload to Google Drive
+        upload_to_drive(drive_service, image_urls_file, root_folder_id)
+        logger.info(f"Successfully uploaded {image_urls_file} to Google Drive")
 
     # Continue with dataset.csv creation
     logging.info("Creating final dataset.csv...")
     
     # Load the data from CSV files
     stats_df = pd.read_csv('all_stats_shots.csv')
-    image_paths_df = pd.read_csv('image_paths.csv')
+    image_paths_df = pd.read_csv('image_urls.csv')
     actions_df = pd.read_csv('unique_actions.csv')
     
     with open('dataset.csv', mode='w', newline='', encoding='utf-8') as csv_file:
@@ -332,7 +339,7 @@ def main():
     
     # Clean up local files
     logger.info("Cleaning up local files...")
-    for file in ['unique_actions.csv', 'all_stats_shots.csv', 'dataset.csv', 'image_paths.csv']:
+    for file in ['unique_actions.csv', 'all_stats_shots.csv', 'dataset.csv', 'image_urls.csv']:
         try:
             if os.path.exists(file):
                 os.remove(file)
