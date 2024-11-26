@@ -219,9 +219,8 @@ def main():
     
     # Check if file already exists in Drive
     try:
-        if check_file_exists(image_paths_file):
+        if check_file_in_drive(drive_service, root_folder_id, image_paths_file):
             logging.info(f"{image_paths_file} already exists in Drive, downloading...")
-            download_from_drive(image_paths_file)
             logging.info("Using existing image paths file")
             with open(image_paths_file, 'r') as f:
                 csv_reader = csv.reader(f)
