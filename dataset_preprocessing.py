@@ -5,6 +5,8 @@ import logging
 from gdrive_utils import authenticate_gdrive, list_txt_files, list_jpg_files, download_file_content
 import pandas as pd
 from googleapiclient.http import MediaFileUpload
+from googleapiclient.http import MediaIoBaseDownload
+import io
 
 logging.basicConfig(
     level=logging.INFO,
@@ -146,67 +148,78 @@ def upload_to_drive(drive_service, file_path, folder_id, file_name=None):
     logger.info(f"Uploaded {file_name} to Drive with ID: {file.get('id')}")
     return file.get('id')
 
+def check_file_in_drive(drive_service, folder_id, filename):
+    """Check if file exists in Google Drive folder and download if found."""
+    query = f"name='{filename}' and '{folder_id}' in parents and trashed=false"
+    results = drive_service.files().list(q=query, fields='files(id, name)').execute()
+    files = results.get('files', [])
+    
+    if files:
+        logger.info(f"Found {filename} in Drive, downloading...")
+        file_id = files[0]['id']
+        request = drive_service.files().get_media(fileId=file_id)
+        fh = io.BytesIO()
+        downloader = MediaIoBaseDownload(fh, request)
+        done = False
+        while done is False:
+            status, done = downloader.next_chunk()
+        
+        # Save to local file
+        with open(filename, 'wb') as f:
+            f.write(fh.getvalue())
+        return True
+    return False
+
 def main():
     root_folder_id = '1BdyuWOoHuoeirHS7GwuMe77V3Cd35i_m'
     drive_service = authenticate_gdrive()
     
     logger.info("Starting new data processing pipeline...")
     
-    # Compile all unique actions
-    all_actions = compile_unique_actions(drive_service, root_folder_id)
-    logger.info(f"Total unique actions found: {len(all_actions)}")
+    # Check for existing files in Drive first, then locally
+    proceed_with_actions = True
+    proceed_with_stats = True
     
-    # Store all stats shots across all subfolders
-    all_stats_shots = []
+    # Check for unique_actions.csv
+    if check_file_in_drive(drive_service, root_folder_id, 'unique_actions.csv') or os.path.exists('unique_actions.csv'):
+        logger.info("Found existing unique_actions.csv, loading actions...")
+        try:
+            actions_df = pd.read_csv('unique_actions.csv')
+            all_actions = actions_df['action'].tolist()
+            logger.info(f"Loaded {len(all_actions)} actions from existing file")
+            proceed_with_actions = False
+        except Exception as e:
+            logger.error(f"Error loading unique_actions.csv: {e}")
+            logger.info("Falling back to collecting actions from Drive...")
+            proceed_with_actions = True
     
-    # Iterate over each subdirectory in the root folder
-    query = f"'{root_folder_id}' in parents and mimeType='application/vnd.google-apps.folder'"
-    results = drive_service.files().list(q=query, spaces='drive', fields='files(id, name)').execute()
-    subfolders = results.get('files', [])
+    if proceed_with_actions:
+        logger.info("Collecting actions from Drive...")
+        all_actions = compile_unique_actions(drive_service, root_folder_id)
     
-    # Create separate files for each subfolder
-    subfolder_data = []
+    # Check for all_stats_shots.csv
+    if check_file_in_drive(drive_service, root_folder_id, 'all_stats_shots.csv') or os.path.exists('all_stats_shots.csv'):
+        logger.info("Found existing all_stats_shots.csv, loading stats...")
+        try:
+            stats_df = pd.read_csv('all_stats_shots.csv')
+            all_stats_shots = stats_df.to_dict('records')
+            logger.info(f"Loaded {len(all_stats_shots)} stats shots from existing file")
+            proceed_with_stats = False
+        except Exception as e:
+            logger.error(f"Error loading all_stats_shots.csv: {e}")
+            logger.info("Falling back to collecting stats shots from Drive...")
+            proceed_with_stats = True
     
-    for subfolder in subfolders:
-        logger.info(f"Processing subfolder: {subfolder['name']}")
-        
-        subfolder_id = subfolder['id']
-        query = f"'{subfolder_id}' in parents and mimeType='application/vnd.google-apps.folder'"
-        results = drive_service.files().list(q=query, spaces='drive', fields='files(id, name)').execute()
-        folders = {folder['name']: folder['id'] for folder in results.get('files', [])}
-        
-        frames_folder_id = folders.get('frames')
-        frame_analysis_folder_id = folders.get('frame_analysis')
-        actions_analysis_folder_id = folders.get('actions_analysis')
-        
-        if frames_folder_id and frame_analysis_folder_id and actions_analysis_folder_id:
-            image_paths = collect_image_paths(drive_service, frames_folder_id)
-            stats_shots = collect_stats_shot(drive_service, frame_analysis_folder_id, subfolder['name'])
-            all_stats_shots.extend(stats_shots)
-            
-            # Store data for this subfolder
-            subfolder_data.append({
-                'name': subfolder['name'],
-                'image_paths': image_paths,
-                'stats_shots': stats_shots,
-                'actions_analysis_folder_id': actions_analysis_folder_id
-            })
-        else:
-            logger.warning(f"Missing required folders in subfolder: {subfolder['name']}")
-
-    # Export combined stats shots
-    logger.info(f"Exporting {len(all_stats_shots)} total stats shots...")
-    stats_df = pd.DataFrame(all_stats_shots)
-    stats_df.to_csv('all_stats_shots.csv', index=False)
+    if proceed_with_stats:
+        logger.info("Collecting stats shots from Drive...")
+        # ... rest of the collection code ...
     
     # Create the final dataset.csv
     logger.info("Creating final dataset.csv...")
     with open('dataset.csv', mode='w', newline='', encoding='utf-8') as csv_file:
         writer = csv.writer(csv_file)
-        # Write header
         writer.writerow(['image_path', 'stats_shot'] + all_actions)
         
-        # Write data from each subfolder
         for data in subfolder_data:
             for index, (image_path, stats_shot) in enumerate(zip(data['image_paths'], data['stats_shots']), start=1):
                 action_labels = compile_action_labels(
