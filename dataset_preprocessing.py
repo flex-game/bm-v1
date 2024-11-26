@@ -15,10 +15,19 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 def collect_image_paths(drive_service, frames_folder_id):
-    """Collect paths to images in the frames directory."""
+    """Collect Google Drive URLs for images in the frames directory."""
     jpg_files = list_jpg_files(drive_service, frames_folder_id)
-    image_paths = [f"frames/{file['name']}" for file in jpg_files]
-    logger.info(f"Collected {len(image_paths)} image paths from frames folder.")
+    
+    # Create direct access URLs for each image
+    image_paths = []
+    for file in jpg_files:
+        # Create a shareable link using the file ID
+        file_id = file['id']
+        # Direct download URL format for Google Drive
+        url = f"https://drive.google.com/uc?id={file_id}"
+        image_paths.append(url)
+    
+    logger.info(f"Collected {len(image_paths)} image URLs from frames folder.")
     return image_paths
 
 def collect_stats_shot(drive_service, frame_analysis_folder_id, subfolder_name):
@@ -253,9 +262,9 @@ def main():
             logging.info(f"Exporting {len(image_paths)} image paths to CSV...")
             with open(image_paths_file, 'w', newline='') as f:
                 writer = csv.writer(f)
-                writer.writerow(['image_path'])  # Header
-                for path in image_paths:
-                    writer.writerow([path])
+                writer.writerow(['image_url'])  # Changed header to reflect URL nature
+                for url in image_paths:
+                    writer.writerow([url])
             
             # Upload to Google Drive
             upload_to_drive(drive_service, image_paths_file, root_folder_id, 'image_paths.csv')
@@ -266,19 +275,24 @@ def main():
 
     # Continue with dataset.csv creation
     logging.info("Creating final dataset.csv...")
+    
+    # Load the data from CSV files
+    stats_df = pd.read_csv('all_stats_shots.csv')
+    image_paths_df = pd.read_csv('image_paths.csv')
+    actions_df = pd.read_csv('unique_actions.csv')
+    
     with open('dataset.csv', mode='w', newline='', encoding='utf-8') as csv_file:
         writer = csv.writer(csv_file)
-        writer.writerow(['image_path', 'stats_shot'] + all_actions)
+        # Header row: image_path, stats_shot, followed by all action columns
+        writer.writerow(['image_path', 'stats_shot'] + actions_df['action'].tolist())
         
-        for data in subfolder_data:
-            for index, (image_path, stats_shot) in enumerate(zip(data['image_paths'], data['stats_shots']), start=1):
-                action_labels = compile_action_labels(
-                    drive_service, 
-                    data['actions_analysis_folder_id'], 
-                    all_actions, 
-                    index
-                )
-                writer.writerow([image_path, json.dumps(stats_shot)] + action_labels)
+        # Write data rows
+        for i in range(len(image_paths_df)):
+            image_path = image_paths_df.iloc[i]['image_path']
+            stats_shot = stats_df.iloc[i].to_dict() if i < len(stats_df) else {}
+            # Initialize all actions as 0 (assuming binary labels)
+            action_values = [0] * len(actions_df)
+            writer.writerow([image_path, json.dumps(stats_shot)] + action_values)
     
     # Upload files to Drive only after all files are created
     logger.info("Uploading files to Google Drive...")
