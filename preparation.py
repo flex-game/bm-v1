@@ -73,7 +73,7 @@ def process_frames(frames_folder_id, analysis_folder_id, actions_folder_id, fram
         file_url = get_image_as_base64(drive_service, file_id)
         description = generate_frame_description(file_url, frame_prompt_path)
         
-        text_file_name = f"{os.path.splitext(file_name)[0]}.txt"
+        text_file_name = f"{os.path.splitext(file_name)[0]}.json"
         print(f"Uploading description to frame_analysis folder")
         upload_text_content(drive_service, analysis_folder_id, text_file_name, description)
 
@@ -96,7 +96,7 @@ def process_frames(frames_folder_id, analysis_folder_id, actions_folder_id, fram
         )
         
         print(f"Uploading action description to actions_analysis folder")
-        action_text_file_name = f"action_{os.path.splitext(file_name1)[0]}_{os.path.splitext(file_name2)[0]}.txt"
+        action_text_file_name = f"action_{os.path.splitext(file_name1)[0]}_{os.path.splitext(file_name2)[0]}.json"
         upload_text_content(drive_service, actions_folder_id, action_text_file_name, action_description)
 
     print("Game analysis complete.")
