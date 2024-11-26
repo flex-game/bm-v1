@@ -334,8 +334,9 @@ def main():
             action_values = [0] * len(all_actions)
             
             try:
-                # Extract image number from the URL (e.g., "14.jpg" -> "14")
-                image_number = image_path.split('/')[-1].split('.')[0]
+                # Get the file name from the Drive file ID
+                file_metadata = drive_service.files().get(fileId=image_path.split('id=')[1], fields='name').execute()
+                image_number = file_metadata['name'].split('.')[0]  # Get number from actual filename
                 
                 # Get subfolder ID
                 query = f"name='{subfolder}' and '{root_folder_id}' in parents"
@@ -353,8 +354,8 @@ def main():
                     if actions_folder:
                         actions_folder_id = actions_folder[0]['id']
                         
-                        # Look for action_{image_number}_*.txt files
-                        query = f"name contains 'action_{image_number}_' and name ends with '.txt' and '{actions_folder_id}' in parents"
+                        # Look for action files with the correct image number
+                        query = f"name contains 'action_{image_number}_' and mimeType='text/plain' and '{actions_folder_id}' in parents"
                         results = drive_service.files().list(q=query, fields='files(id)').execute()
                         action_files = results.get('files', [])
                         
