@@ -180,6 +180,20 @@ def upload_to_drive(drive_service, file_path, folder_id, file_name=None):
     
     return file.get('id')
 
+def download_file_from_drive(drive_service, file_id, filename):
+    """Download a file from Google Drive."""
+    request = drive_service.files().get_media(fileId=file_id)
+    fh = io.BytesIO()
+    downloader = MediaIoBaseDownload(fh, request)
+    done = False
+    while done is False:
+        status, done = downloader.next_chunk()
+    fh.seek(0)
+    
+    with open(filename, 'wb') as f:
+        f.write(fh.read())
+    logger.info(f"Downloaded {filename} from Drive")
+
 def main():
     root_folder_id = '1BdyuWOoHuoeirHS7GwuMe77V3Cd35i_m'
     drive_service = authenticate_gdrive()
@@ -191,9 +205,14 @@ def main():
     proceed_with_stats = True
     
     # Check for unique_actions.csv
-    if check_file_in_drive(drive_service, root_folder_id, 'unique_actions.csv') or os.path.exists('unique_actions.csv'):
+    actions_file_id = check_file_in_drive(drive_service, root_folder_id, 'unique_actions.csv')
+    if actions_file_id or os.path.exists('unique_actions.csv'):
         logger.info("Found existing unique_actions.csv, loading actions...")
         try:
+            # Download the file if it exists in Drive but not locally
+            if actions_file_id and not os.path.exists('unique_actions.csv'):
+                download_file_from_drive(drive_service, actions_file_id, 'unique_actions.csv')
+            
             actions_df = pd.read_csv('unique_actions.csv')
             all_actions = actions_df['action'].tolist()
             logger.info(f"Loaded {len(all_actions)} actions from existing file")
@@ -208,9 +227,14 @@ def main():
         all_actions = compile_unique_actions(drive_service, root_folder_id)
     
     # Check for all_stats_shots.csv
-    if check_file_in_drive(drive_service, root_folder_id, 'all_stats_shots.csv') or os.path.exists('all_stats_shots.csv'):
+    stats_file_id = check_file_in_drive(drive_service, root_folder_id, 'all_stats_shots.csv')
+    if stats_file_id or os.path.exists('all_stats_shots.csv'):
         logger.info("Found existing all_stats_shots.csv, loading stats...")
         try:
+            # Download the file if it exists in Drive but not locally
+            if stats_file_id and not os.path.exists('all_stats_shots.csv'):
+                download_file_from_drive(drive_service, stats_file_id, 'all_stats_shots.csv')
+            
             stats_df = pd.read_csv('all_stats_shots.csv')
             all_stats_shots = stats_df.to_dict('records')
             logger.info(f"Loaded {len(all_stats_shots)} stats shots from existing file")
