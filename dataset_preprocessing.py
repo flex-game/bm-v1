@@ -214,6 +214,29 @@ def main():
         logger.info("Collecting stats shots from Drive...")
         # ... rest of the collection code ...
     
+    # Add this section to collect image paths
+    logger.info("Collecting image paths...")
+    query = f"'{root_folder_id}' in parents and mimeType='application/vnd.google-apps.folder'"
+    results = drive_service.files().list(q=query, spaces='drive', fields='files(id, name)').execute()
+    subfolders = results.get('files', [])
+    
+    # Get the frames folder ID from the first subfolder (assuming consistent structure)
+    if subfolders:
+        subfolder_id = subfolders[0]['id']
+        query = f"'{subfolder_id}' in parents and mimeType='application/vnd.google-apps.folder'"
+        results = drive_service.files().list(q=query, spaces='drive', fields='files(id, name)').execute()
+        folders = {folder['name']: folder['id'] for folder in results.get('files', [])}
+        
+        frames_folder_id = folders.get('frames')
+        if frames_folder_id:
+            image_paths = collect_image_paths(drive_service, frames_folder_id)
+        else:
+            logger.error("Could not find frames folder")
+            image_paths = []
+    else:
+        logger.error("No subfolders found")
+        image_paths = []
+
     # Before exporting image paths
     image_paths_file = 'image_paths.csv'
     
