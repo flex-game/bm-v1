@@ -405,6 +405,17 @@ def main():
                         
                         for file_info in action_files:
                             try:
+                                # Add debug logging to see what we're getting
+                                logging.debug(f"File info received: {file_info}")
+                                
+                                if not isinstance(file_info, dict):
+                                    logging.error(f"file_info is not a dictionary: {type(file_info)}")
+                                    continue
+                                    
+                                if 'name' not in file_info:
+                                    logging.error(f"'name' not found in file_info keys: {file_info.keys()}")
+                                    continue
+                                
                                 filename = file_info['name']
                                 logging.info(f"Processing file: {filename}")
                                 
@@ -430,6 +441,7 @@ def main():
                                 
                             except Exception as e:
                                 logging.error(f"Error processing action file: {str(e)}")
+                                logging.error(f"File info that caused error: {file_info}")
                                 continue
                     else:
                         logger.warning(f"No action file found for image {image_number} in {subfolder}")
