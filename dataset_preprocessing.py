@@ -214,8 +214,36 @@ def main():
         logger.info("Collecting stats shots from Drive...")
         # ... rest of the collection code ...
     
-    # Create the final dataset.csv
-    logger.info("Creating final dataset.csv...")
+    # Before exporting image paths
+    image_paths_file = 'image_paths.csv'
+    
+    # Check if file already exists in Drive
+    try:
+        if check_file_exists(image_paths_file):
+            logging.info(f"{image_paths_file} already exists in Drive, downloading...")
+            download_from_drive(image_paths_file)
+            logging.info("Using existing image paths file")
+            with open(image_paths_file, 'r') as f:
+                csv_reader = csv.reader(f)
+                next(csv_reader)  # Skip header
+                image_paths = [row[0] for row in csv_reader]
+        else:
+            logging.info(f"Exporting {len(image_paths)} image paths to CSV...")
+            with open(image_paths_file, 'w', newline='') as f:
+                writer = csv.writer(f)
+                writer.writerow(['image_path'])  # Header
+                for path in image_paths:
+                    writer.writerow([path])
+            
+            # Upload to Google Drive
+            upload_to_drive(image_paths_file, 'image_paths.csv')
+            logging.info(f"Successfully uploaded {image_paths_file} to Google Drive")
+    except Exception as e:
+        logging.error(f"Error handling image paths file: {str(e)}")
+        raise
+
+    # Continue with dataset.csv creation
+    logging.info("Creating final dataset.csv...")
     with open('dataset.csv', mode='w', newline='', encoding='utf-8') as csv_file:
         writer = csv.writer(csv_file)
         writer.writerow(['image_path', 'stats_shot'] + all_actions)
