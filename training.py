@@ -35,11 +35,11 @@ def load_and_preprocess_data(csv_path, max_sequence_length=50, num_words=10000):
         img_array = resnet_preprocess_input(img_array)
         return img_array
 
-    image_urls = df['image_url'].values
+    image_urls = df['image_path'].values
     images = np.array([preprocess_image_from_url(url) for url in image_urls])
 
     # Action labels
-    actions = df.drop(columns=['image_url', 'stats_shot']).values
+    actions = df.drop(columns=['image_path', 'stats_shot']).values
 
     return images, padded_sequences, actions, tokenizer
 
