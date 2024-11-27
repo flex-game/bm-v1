@@ -435,16 +435,18 @@ def main():
                                 actions = parse_action_file_content(content)
                                 
                                 if actions:
-                                    # Process the actions, associating them with all relevant action numbers
-                                    for action_num in action_nums:
-                                        try:
-                                            # Convert action_num to int and find its index in all_actions
-                                            action_index = all_actions.index(f"action_{action_num}")
+                                    # actions will be a list like ["Moved unit Scout one tile southeast"]
+                                    for action in actions:
+                                        # Look for exact matches in all_actions
+                                        if action in all_actions:
+                                            action_index = all_actions.index(action)
                                             action_values[action_index] = 1
-                                            logging.debug(f"Set action_{action_num} to 1")
-                                        except ValueError as e:
-                                            logging.warning(f"Action number {action_num} not found in all_actions list")
-                                            continue
+                                            logging.debug(f"Found exact action match: '{action}'")
+                                        else:
+                                            # Log when we don't find a match to help debug
+                                            logging.debug(f"No match found for action: '{action}'")
+                                            # Optionally, you might want to add some fuzzy matching here
+                                            # in case there are slight text differences
                                 else:
                                     logging.warning(f"No valid actions found in file {filename} ({action_nums})")
                                 
