@@ -46,12 +46,12 @@ def load_and_preprocess_data(csv_path, max_sequence_length=50, num_words=10000):
 # Create the multi-modal model
 def create_multimodal_model(vocab_size, embedding_dim, max_sequence_length):
     # Image model
-    image_input = Input(shape=(224, 224, 3))
+    image_input = Input(shape=(224, 224, 3), name='input_layer')
     base_model = ResNet50(weights='imagenet', include_top=False, pooling='avg')
     image_features = base_model(image_input)
 
     # Text model
-    text_input = Input(shape=(max_sequence_length,))
+    text_input = Input(shape=(max_sequence_length,), name='input_layer_2')
     text_embedding = Embedding(vocab_size, embedding_dim)(text_input)
     text_features = LSTM(128)(text_embedding)
 
@@ -116,7 +116,10 @@ def main():
     model = create_multimodal_model(vocab_size, embedding_dim, max_sequence_length)
 
     # Create TensorFlow Dataset
-    dataset = tf.data.Dataset.from_tensor_slices(({'input_1': images, 'input_2': text_sequences}, actions))
+    dataset = tf.data.Dataset.from_tensor_slices((
+        {'input_layer': images, 'input_layer_2': text_sequences}, 
+        actions
+    ))
     dataset = dataset.shuffle(buffer_size=1000).batch(32)
 
     # Train the model
