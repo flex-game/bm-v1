@@ -14,6 +14,8 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 import io
 import os
+from oauth2client.service_account import ServiceAccountCredentials
+from dotenv import load_dotenv
 
 # Load and preprocess the dataset
 def load_and_preprocess_data(csv_path, max_sequence_length=50, num_words=10000):
@@ -63,8 +65,12 @@ def create_multimodal_model(vocab_size, embedding_dim, max_sequence_length):
     return model
 
 def setup_google_drive():
-    # Assuming you have the credentials setup as in other parts of the codebase
-    creds = Credentials.from_authorized_user_file('token.json', ['https://www.googleapis.com/auth/drive.readonly'])
+    """Authenticate and return a Google Drive client."""
+    scope = ["https://www.googleapis.com/auth/drive"]
+    credentials_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
+    if not credentials_path:
+        raise ValueError("GOOGLE_APPLICATION_CREDENTIALS environment variable is not set or is empty.")
+    creds = ServiceAccountCredentials.from_json_keyfile_name(credentials_path, scope)
     service = build('drive', 'v3', credentials=creds)
     return service
 
