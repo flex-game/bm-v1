@@ -9,6 +9,11 @@ import pandas as pd
 import numpy as np
 import requests
 from io import BytesIO
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseDownload
+import io
+import os
 
 # Load and preprocess the dataset
 def load_and_preprocess_data(csv_path, max_sequence_length=50, num_words=10000):
@@ -57,9 +62,45 @@ def create_multimodal_model(vocab_size, embedding_dim, max_sequence_length):
     model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
     return model
 
+def setup_google_drive():
+    # Assuming you have the credentials setup as in other parts of the codebase
+    creds = Credentials.from_authorized_user_file('token.json', ['https://www.googleapis.com/auth/drive.readonly'])
+    service = build('drive', 'v3', credentials=creds)
+    return service
+
+def download_from_drive(service, folder_id, filename):
+    # Search for the file in the specified folder
+    query = f"'{folder_id}' in parents and name='{filename}'"
+    results = service.files().list(q=query, spaces='drive').execute()
+    files = results.get('files', [])
+    
+    if not files:
+        raise FileNotFoundError(f"'{filename}' not found in the specified Google Drive folder")
+    
+    file_id = files[0]['id']
+    request = service.files().get_media(fileId=file_id)
+    
+    fh = io.BytesIO()
+    downloader = MediaIoBaseDownload(fh, request)
+    done = False
+    while done is False:
+        status, done = downloader.next_chunk()
+        print(f"Download {int(status.progress() * 100)}%")
+    
+    # Save the file locally
+    output_path = os.path.join(os.getcwd(), filename)
+    with open(output_path, 'wb') as f:
+        f.write(fh.getvalue())
+    
+    return output_path
+
 # Main function to load data, create model, and train
 def main():
-    csv_path = 'dataset.csv'
+    # Download dataset from Google Drive
+    service = setup_google_drive()
+    folder_id = "14rV_AfSINfFyUQgZN4wJEgGtJCyzlv0a"
+    csv_path = download_from_drive(service, folder_id, 'dataset.csv')
+    
     images, text_sequences, actions, tokenizer = load_and_preprocess_data(csv_path)
 
     vocab_size = len(tokenizer.word_index) + 1
