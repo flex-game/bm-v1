@@ -57,7 +57,7 @@ def create_multimodal_model(vocab_size, embedding_dim, max_sequence_length):
 
     # Combine features
     combined_features = Concatenate()([image_features, text_features])
-    dense_output = Dense(200, activation='sigmoid')(combined_features)
+    dense_output = Dense(166, activation='sigmoid')(combined_features)
 
     # Model
     model = tf.keras.Model(inputs=[image_input, text_input], outputs=dense_output)
