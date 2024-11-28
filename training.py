@@ -116,6 +116,10 @@ def upload_model_to_drive(service, folder_id, model_path):
                                     fields='id').execute()
         print(f"Model uploaded to Drive with file ID: {file.get('id')}")
         
+        # Clean up local file
+        os.remove(model_path)
+        print(f"Local model file {model_path} removed")
+        
     except Exception as e:
         print(f"Error uploading model to Drive: {str(e)}")
 
@@ -144,7 +148,7 @@ def main():
     # Train the model
     model.fit(dataset, epochs=10)
 
-    # After training completes, add:
+    # After training completes:
     model.save('trained_model.h5')  # Save locally first
     upload_model_to_drive(service, "14rV_AfSINfFyUQgZN4wJEgGtJCyzlv0a", 'trained_model.h5')
 
