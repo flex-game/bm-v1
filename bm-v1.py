@@ -6,45 +6,72 @@ from tensorflow.keras.preprocessing.sequence import pad_sequences
 from gdrive_utils import authenticate_gdrive
 import io
 from googleapiclient.http import MediaIoBaseDownload, MediaFileUpload
+from tensorflow.keras.preprocessing.image import load_img, img_to_array
+from tensorflow.keras.applications.resnet50 import preprocess_input as resnet_preprocess_input
+from openai_utils import generate_frame_description
+import logging
+import uuid
+from datetime import datetime
+import requests
 
-def preprocess_input(text, tokenizer, max_sequence_length):
-    """Preprocess the input text for prediction."""
-    # Create main sequence
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+def clean_and_tokenize_text(text, tokenizer, max_sequence_length):
+    """Clean and tokenize the text for model input."""
+    # Clean the text
+    text = text.strip()
+    if text.startswith('```') and text.endswith('```'):
+        text = text[3:-3].strip()  # Remove markdown code block markers
+
+    # Tokenize the text
     sequences = tokenizer.texts_to_sequences([text])
     padded_sequences = pad_sequences(sequences, maxlen=max_sequence_length)
     
-    # Create decoder input sequence (shifted target sequence starting with start token)
-    # Assuming start token is index 1 (common practice), adjust if different
-    decoder_input = np.zeros((1, max_sequence_length))
-    decoder_input[:, 0] = 1  # Set start token
+    return padded_sequences
+
+def preprocess_input(text, image_url, tokenizer, max_sequence_length):
+    """Preprocess the input text and image for prediction."""
+    # Clean and tokenize text
+    padded_sequences = clean_and_tokenize_text(text, tokenizer, max_sequence_length)
     
-    return [padded_sequences, decoder_input]
+    # Image preprocessing
+    img = load_img(image_url, target_size=(224, 224))
+    img_array = img_to_array(img)
+    img_array = resnet_preprocess_input(img_array)
+    img_array = np.expand_dims(img_array, axis=0)  # Add batch dimension
+    
+    return {'input_layer': img_array, 'input_layer_2': padded_sequences}
 
-def predict_actions(model, input_sequence, tokenizer):
-    """Predict actions from the input sequence using the model."""
-    predictions = model.predict(input_sequence)
-    predicted_sequences = np.argmax(predictions, axis=-1)
-
-    # Convert predicted sequences back to text
-    reverse_word_index = {index: word for word, index in tokenizer.word_index.items()}
-    predicted_actions = []
-    for sequence in predicted_sequences:
-        actions = [reverse_word_index.get(index, '') for index in sequence if index != 0]
-        predicted_actions.append(' '.join(actions))
+def predict_actions(model, input_data):
+    """Predict actions from the input data using the model."""
+    predictions = model.predict(input_data)
+    predicted_actions = np.argmax(predictions, axis=-1)
     return predicted_actions
 
+def upload_to_drive(service, file_path, folder_id, file_name):
+    """Upload a file to Google Drive."""
+    media = MediaFileUpload(file_path, mimetype='text/plain', resumable=True)
+    file_metadata = {
+        'name': file_name,
+        'parents': [folder_id]
+    }
+    file = service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+    logger.info(f"Uploaded {file_name} to Drive with ID: {file.get('id')}")
+    return file.get('id')
+
 def main():
-    print("Checking for local model files...")
+    logger.info("Checking for local model files...")
     need_model = not os.path.exists('model.keras')
     need_tokenizer = not os.path.exists('tokenizer.pickle')
-    need_game_state = not os.path.exists('game_state.txt')
     
-    if need_model or need_tokenizer or need_game_state:
-        print("Some files missing locally. Initializing Google Drive connection...")
+    if need_model or need_tokenizer:
+        logger.info("Some files missing locally. Initializing Google Drive connection...")
         drive_service = authenticate_gdrive()
         
         if need_model:
-            print("Downloading model from Drive...")
+            logger.info("Downloading model from Drive...")
             # Download model
             query = "name='model.keras' and trashed=false"
             results = drive_service.files().list(
@@ -71,7 +98,7 @@ def main():
                 f.write(model_buffer.getvalue())
         
         if need_tokenizer:
-            print("Downloading tokenizer from Drive...")
+            logger.info("Downloading tokenizer from Drive...")
             # Download tokenizer
             query = "name='tokenizer.pickle' and trashed=false"
             results = drive_service.files().list(
@@ -96,34 +123,8 @@ def main():
             # Save tokenizer temporarily
             with open('tokenizer.pickle', 'wb') as f:
                 f.write(tokenizer_buffer.getvalue())
-        
-        if need_game_state:
-            print("Downloading game state from Drive...")
-            query = "name='game_state.txt' and trashed=false"
-            results = drive_service.files().list(
-                q=query,
-                spaces='drive',
-                fields='files(id, name)'
-            ).execute()
-            
-            files = results.get('files', [])
-            if not files:
-                raise FileNotFoundError("game_state.txt not found in Google Drive")
-            
-            game_state_file_id = files[0]['id']
-            request = drive_service.files().get_media(fileId=game_state_file_id)
-            game_state_buffer = io.BytesIO()
-            downloader = MediaIoBaseDownload(game_state_buffer, request)
-            done = False
-            while not done:
-                _, done = downloader.next_chunk()
-            game_state_buffer.seek(0)
-            
-            # Save game state temporarily
-            with open('game_state.txt', 'wb') as f:
-                f.write(game_state_buffer.getvalue())
     else:
-        print("Using existing local files...")
+        logger.info("Using existing local files...")
 
     # Now load the model
     model = tf.keras.models.load_model('model.keras')
@@ -132,78 +133,61 @@ def main():
     with open('tokenizer.pickle', 'rb') as handle:
         tokenizer = pickle.load(handle)
 
-    # Read the game state
-    with open('game_state.txt', 'r') as f:
-        game_state_description = f.read()
+    # Prompt user for image URL
+    image_url = input("Please enter the image URL: ")
+
+    # Generate text sequence using OpenAI
+    frame_prompt_path = 'system_prompts/frame_analysis_system_prompt.txt'
+    raw_text = generate_frame_description(image_url, frame_prompt_path)
+
+    # Create unique filenames
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    unique_id = uuid.uuid4().hex
+    text_filename = f"text_{timestamp}_{unique_id}.txt"
+    image_filename = f"image_{timestamp}_{unique_id}.jpg"
+    prediction_filename = f"prediction_{timestamp}_{unique_id}.txt"
+
+    # Save the text and image locally
+    with open(text_filename, 'w') as f:
+        f.write(raw_text)
+    logger.info(f"Saved text to {text_filename}")
+
+    # Download and save the image locally
+    img_data = requests.get(image_url).content
+    with open(image_filename, 'wb') as f:
+        f.write(img_data)
+    logger.info(f"Saved image to {image_filename}")
+
+    # Upload text and image to Google Drive
+    usage_logs_folder_id = '1NMIZXKWUxAX428xNfTl36fjZiryqyWDZ'
+    drive_service = authenticate_gdrive()
+    upload_to_drive(drive_service, text_filename, usage_logs_folder_id, text_filename)
+    upload_to_drive(drive_service, image_filename, usage_logs_folder_id, image_filename)
 
     # Preprocess the input
-    max_sequence_length = 100
-    input_sequence = preprocess_input(game_state_description, tokenizer, max_sequence_length)
+    max_sequence_length = 50  # Ensure this matches the training setup
+    input_data = preprocess_input(raw_text, image_url, tokenizer, max_sequence_length)
 
     # Predict actions
-    predicted_actions = predict_actions(model, input_sequence, tokenizer)
+    predicted_actions = predict_actions(model, input_data)
 
-    # After predicting actions
-    print("\nPredicted Actions:")
-    with open('action_prediction.txt', 'w') as f:
+    # Save and upload the prediction
+    with open(prediction_filename, 'w') as f:
         for actions in predicted_actions:
-            print(actions)  # Print each prediction
             f.write(actions + '\n')
-    
-    print("\nUploading to Google Drive...")
-    drive_service = authenticate_gdrive()
-    
-    try:
-        media = MediaFileUpload('action_prediction.txt', 
-                              mimetype='text/plain',
-                              resumable=True)
-        
-        # Set the specific folder ID where models are stored
-        file_metadata = {
-            'name': 'action_prediction.txt',
-            'mimeType': 'text/plain',
-            'parents': ['14rV_AfSINfFyUQgZN4wJEgGtJCyzlv0a']  # Specific folder ID
-        }
-        
-        # Check if file exists in this specific folder
-        query = "name='action_prediction.txt' and '14rV_AfSINfFyUQgZN4wJEgGtJCyzlv0a' in parents and trashed=false"
-        results = drive_service.files().list(q=query).execute()
-        files = results.get('files', [])
-        
-        if files:
-            file = drive_service.files().update(
-                fileId=files[0]['id'],
-                media_body=media,
-                fields='id'
-            ).execute()
-            print(f"Updated existing file in Drive (ID: {file.get('id')})")
-        else:
-            file = drive_service.files().create(
-                body=file_metadata,
-                media_body=media,
-                fields='id'
-            ).execute()
-            print(f"Created new file in Drive (ID: {file.get('id')})")
-    except Exception as e:
-        print(f"Upload failed: {str(e)}")
+    logger.info(f"Saved prediction to {prediction_filename}")
+    upload_to_drive(drive_service, prediction_filename, usage_logs_folder_id, prediction_filename)
 
     # Clean up local files
-    os.remove('action_prediction.txt')  # Add this to your existing cleanup
+    os.remove(text_filename)
+    os.remove(image_filename)
+    os.remove(prediction_filename)
     if os.path.exists('model.keras'):
         os.remove('model.keras')
     if os.path.exists('tokenizer.pickle'):
         os.remove('tokenizer.pickle')
-    if os.path.exists('game_state.txt'):
-        os.remove('game_state.txt')
 
-    # After loading the model and tokenizer, add:
-    print("Model config:", model.get_config())
-    print("\nTokenizer special tokens:", {
-        'oov_token': tokenizer.oov_token,
-        'word_counts': len(tokenizer.word_counts),
-        'document_count': tokenizer.document_count,
-        'num_words': tokenizer.num_words
-    })
+    logger.info("Process complete.")
 
 if __name__ == "__main__":
     main()
