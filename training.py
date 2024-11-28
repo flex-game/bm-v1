@@ -209,18 +209,32 @@ def main():
     folder_id = "14rV_AfSINfFyUQgZN4wJEgGtJCyzlv0a"
     csv_path = download_from_drive(service, folder_id, 'dataset.csv')
     
-    logger.info("Loading and preprocessing dataset...")
-    images, text_sequences, actions, tokenizer, action_mapping = load_and_preprocess_data(csv_path)
+    # First check if preprocessed images exist in Drive
+    if check_preprocessed_images(service, folder_id):
+        logger.info("Loading preprocessed images from local directory...")
+        images = np.load('preprocessed_images/images.npy')
+        text_sequences = np.load('preprocessed_images/text_sequences.npy')
+        actions = np.load('preprocessed_images/actions.npy')
+        
+        # Still need to process the CSV to get the tokenizer and action_mapping
+        df = pd.read_csv(csv_path)
+        tokenizer = Tokenizer(num_words=10000)
+        tokenizer.fit_on_texts(df['stats_shot'])
+        action_columns = df.drop(columns=['image_path', 'stats_shot']).columns
+        action_mapping = {i: action for i, action in enumerate(action_columns)}
+    else:
+        logger.info("Processing images from scratch...")
+        images, text_sequences, actions, tokenizer, action_mapping = load_and_preprocess_data(csv_path)
 
-    # Save preprocessed images
-    if not os.path.exists('preprocessed_images'):
-        os.makedirs('preprocessed_images')
-    np.save('preprocessed_images/images.npy', images)
-    np.save('preprocessed_images/text_sequences.npy', text_sequences)
-    np.save('preprocessed_images/actions.npy', actions)
-    
-    # Zip and upload preprocessed images
-    zip_and_upload_preprocessed_images(service, folder_id)
+        # Save preprocessed images
+        if not os.path.exists('preprocessed_images'):
+            os.makedirs('preprocessed_images')
+        np.save('preprocessed_images/images.npy', images)
+        np.save('preprocessed_images/text_sequences.npy', text_sequences)
+        np.save('preprocessed_images/actions.npy', actions)
+        
+        # Zip and upload preprocessed images
+        zip_and_upload_preprocessed_images(service, folder_id)
     
     vocab_size = len(tokenizer.word_index) + 1
     embedding_dim = 50
