@@ -49,6 +49,8 @@ def load_and_preprocess_data(csv_path, max_sequence_length=50, num_words=10000):
 
     # Action labels
     actions = df.drop(columns=['image_path', 'stats_shot']).values
+    action_columns = df.drop(columns=['image_path', 'stats_shot']).columns
+    action_mapping = {i: action for i, action in enumerate(action_columns)}
 
     logger.info("Image preprocessing complete")
     return images, padded_sequences, actions, tokenizer
@@ -240,7 +242,8 @@ def main():
         'tokenizer': tokenizer,
         'max_sequence_length': max_sequence_length,
         'vocab_size': vocab_size,
-        'embedding_dim': embedding_dim
+        'embedding_dim': embedding_dim,
+        'action_mapping': action_mapping
     }
     
     with open('preprocessing_info.pkl', 'wb') as f:

@@ -13,6 +13,7 @@ import logging
 import uuid
 from datetime import datetime
 import requests
+from io import BytesIO
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -31,13 +32,20 @@ def clean_and_tokenize_text(text, tokenizer, max_sequence_length):
     
     return padded_sequences
 
-def preprocess_input(text, image_url, tokenizer, max_sequence_length):
+def preprocess_input(raw_text, image_url, tokenizer, max_sequence_length):
     """Preprocess the input text and image for prediction."""
+    response = requests.get(image_url)
+    
+    if response.status_code != 200:
+        raise Exception(f"Failed to download image. Status code: {response.status_code}")
+    
+    # Load and process image
+    img = load_img(BytesIO(response.content), target_size=(224, 224))
+    
     # Clean and tokenize text
-    padded_sequences = clean_and_tokenize_text(text, tokenizer, max_sequence_length)
+    padded_sequences = clean_and_tokenize_text(raw_text, tokenizer, max_sequence_length)
     
     # Image preprocessing
-    img = load_img(image_url, target_size=(224, 224))
     img_array = img_to_array(img)
     img_array = resnet_preprocess_input(img_array)
     img_array = np.expand_dims(img_array, axis=0)  # Add batch dimension
@@ -60,13 +68,6 @@ def upload_to_drive(service, file_path, folder_id, file_name):
     file = service.files().create(body=file_metadata, media_body=media, fields='id').execute()
     logger.info(f"Uploaded {file_name} to Drive with ID: {file.get('id')}")
     return file.get('id')
-
-def get_direct_image_url(url):
-    """Convert Google Drive sharing URL to direct download URL."""
-    if "drive.google.com" in url:
-        file_id = url.split('/d/')[-1].split('/')[0]
-        return f"https://drive.google.com/uc?export=view&id={file_id}"
-    return url
 
 def get_preprocessing_info(drive_service):
     """Download and load preprocessing info from Google Drive."""
@@ -111,6 +112,7 @@ def main():
     max_sequence_length = preprocessing_info['max_sequence_length']
     vocab_size = preprocessing_info['vocab_size']
     embedding_dim = preprocessing_info['embedding_dim']
+    action_mapping = preprocessing_info['action_mapping']
 
     logger.info("Checking for local model files...")
     need_model = not os.path.exists('trained_model.h5')
@@ -149,8 +151,7 @@ def main():
 
     # Prompt user for image URL
     image_url = input("Please enter the image URL: ")
-    image_url = get_direct_image_url(image_url)  # Convert to direct URL if needed
-
+    
     # Generate text sequence using OpenAI
     frame_prompt_path = 'system_prompts/frame_analysis_system_prompt.txt'
     raw_text = generate_frame_description(image_url, frame_prompt_path)
@@ -186,8 +187,9 @@ def main():
 
     # Save and upload the prediction
     with open(prediction_filename, 'w') as f:
-        for actions in predicted_actions:
-            f.write(actions + '\n')
+        for action_index in predicted_actions:
+            action_name = action_mapping.get(action_index, "Unknown Action")
+            f.write(f"Action Index: {action_index}, Action: {action_name}\n")
     logger.info(f"Saved prediction to {prediction_filename}")
     upload_to_drive(drive_service, prediction_filename, usage_logs_folder_id, prediction_filename)
 
