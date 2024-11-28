@@ -53,7 +53,7 @@ def load_and_preprocess_data(csv_path, max_sequence_length=50, num_words=10000):
     action_mapping = {i: action for i, action in enumerate(action_columns)}
 
     logger.info("Image preprocessing complete")
-    return images, padded_sequences, actions, tokenizer
+    return images, padded_sequences, actions, tokenizer, action_mapping
 
 # Create the multi-modal model
 def create_multimodal_model(vocab_size, embedding_dim, max_sequence_length):
@@ -210,7 +210,7 @@ def main():
     csv_path = download_from_drive(service, folder_id, 'dataset.csv')
     
     logger.info("Loading and preprocessing dataset...")
-    images, text_sequences, actions, tokenizer = load_and_preprocess_data(csv_path)
+    images, text_sequences, actions, tokenizer, action_mapping = load_and_preprocess_data(csv_path)
 
     # Save preprocessed images
     if not os.path.exists('preprocessed_images'):
