@@ -60,7 +60,10 @@ def predict_actions(model, input_data):
 
 def upload_to_drive(service, file_path, folder_id, file_name):
     """Upload a file to Google Drive."""
-    media = MediaFileUpload(file_path, mimetype='text/plain', resumable=True)
+    # Determine MIME type based on file extension
+    mime_type = 'image/jpeg' if file_name.endswith(('.jpg', '.jpeg')) else 'text/plain'
+    
+    media = MediaFileUpload(file_path, mimetype=mime_type, resumable=True)
     file_metadata = {
         'name': file_name,
         'parents': [folder_id]
@@ -169,10 +172,14 @@ def main():
     logger.info(f"Saved text to {text_filename}")
 
     # Download and save the image locally
-    img_data = requests.get(image_url).content
-    with open(image_filename, 'wb') as f:
-        f.write(img_data)
-    logger.info(f"Saved image to {image_filename}")
+    response = requests.get(image_url)
+    if response.status_code == 200:
+        with open(image_filename, 'wb') as f:
+            f.write(response.content)
+        logger.info(f"Saved image to {image_filename}")
+    else:
+        logger.error(f"Failed to download image. Status code: {response.status_code}")
+        return
 
     # Upload text and image to Google Drive
     usage_logs_folder_id = '1NMIZXKWUxAX428xNfTl36fjZiryqyWDZ'
