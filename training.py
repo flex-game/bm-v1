@@ -150,20 +150,27 @@ def check_preprocessed_images(service, folder_id):
             file_id = files[0]['id']
             request = service.files().get_media(fileId=file_id)
             
-            # Download the zip file
-            with open('preprocessed_images.zip', 'wb') as f:
+            # Create directory if it doesn't exist
+            if not os.path.exists('preprocessed_images'):
+                os.makedirs('preprocessed_images')
+            
+            # Download and extract zip file
+            zip_path = 'preprocessed_images/preprocessed_images.zip'
+            with open(zip_path, 'wb') as f:
                 downloader = MediaIoBaseDownload(f, request)
                 done = False
                 while done is False:
                     _, done = downloader.next_chunk()
                     logger.info("Downloading preprocessed images...")
             
-            # Extract zip file
-            with zipfile.ZipFile('preprocessed_images.zip', 'r') as zip_ref:
-                zip_ref.extractall('preprocessed_images')
+            # Extract zip file, flattening the directory structure
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                for zip_info in zip_ref.filelist:
+                    zip_info.filename = os.path.basename(zip_info.filename)
+                    zip_ref.extract(zip_info, 'preprocessed_images')
             
             # Clean up zip file
-            os.remove('preprocessed_images.zip')
+            os.remove(zip_path)
             logger.info("Successfully extracted preprocessed images")
             return True
             
@@ -212,6 +219,7 @@ def main():
     # First check if preprocessed images exist in Drive
     if check_preprocessed_images(service, folder_id):
         logger.info("Loading preprocessed images from local directory...")
+        # Use relative paths
         images = np.load('preprocessed_images/images.npy')
         text_sequences = np.load('preprocessed_images/text_sequences.npy')
         actions = np.load('preprocessed_images/actions.npy')
@@ -240,6 +248,7 @@ def main():
     embedding_dim = 50
     max_sequence_length = 50
 
+    '''
     # Original model training code
     model = create_multimodal_model(vocab_size, embedding_dim, max_sequence_length)
     dataset = tf.data.Dataset.from_tensor_slices((
@@ -250,7 +259,8 @@ def main():
     model.fit(dataset, epochs=10)
     model.save('trained_model.keras')
     upload_model_to_drive(service, folder_id, 'trained_model.keras')
-
+    '''
+    
     # Save preprocessing info
     preprocessing_info = {
         'tokenizer': tokenizer,
