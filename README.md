@@ -4,8 +4,7 @@
 
 ### Prerequisites
 
-- Install a terminal app like a-Shell or iSH on your iOS device.
-- Ensure Python 3 is installed.
+- Python 3
 
 ### Virtual Environment Setup
 
@@ -24,13 +23,13 @@
    pip install -r requirements.txt
    ```
 
-### Environment Variables
+### Environment Variables (primarily for Google Drive and OpenAI in training)
 
 - Create a `.env` file in the root directory.
-- Add your environment variables in the following format:
+- Add environment variables in the following format:
   ```plaintext
-  SECRET_KEY=your_secret_key
-  DEBUG=True
+  OPENAI_API_KEY=your_key
+  GOOGLE_APPLICATION_CREDENTIALS=your_credentials
   ```
 
 ### Deactivate the Virtual Environment
@@ -40,7 +39,10 @@
   deactivate
   ```
 
-## Usage
+To run the `bm-v1.py` program, follow these steps:
 
-- Activate the virtual environment before running your scripts.
-- Use `python your_script.py` to execute your Python scripts.
+1. **Navigate to the directory** where the `bm-v1.py` file is located.
+
+2. **Execute the program** using Python. 
+
+3. **Follow any on-screen instructions** or prompts provided by the program. You will be required to enter an Image URL that the model can use to generate its prediction.
