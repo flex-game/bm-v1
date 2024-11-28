@@ -19,6 +19,7 @@ from dotenv import load_dotenv
 import logging
 import time
 import zipfile
+import pickle
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
@@ -209,36 +210,58 @@ def main():
     logger.info("Loading and preprocessing dataset...")
     images, text_sequences, actions, tokenizer = load_and_preprocess_data(csv_path)
 
+    # Save preprocessed images
+    if not os.path.exists('preprocessed_images'):
+        os.makedirs('preprocessed_images')
+    np.save('preprocessed_images/images.npy', images)
+    np.save('preprocessed_images/text_sequences.npy', text_sequences)
+    np.save('preprocessed_images/actions.npy', actions)
+    
+    # Zip and upload preprocessed images
+    zip_and_upload_preprocessed_images(service, folder_id)
+    
     vocab_size = len(tokenizer.word_index) + 1
     embedding_dim = 50
     max_sequence_length = 50
 
+    # Original model training code
     model = create_multimodal_model(vocab_size, embedding_dim, max_sequence_length)
-
-    # Create TensorFlow Dataset
     dataset = tf.data.Dataset.from_tensor_slices((
         {'input_layer': images, 'input_layer_2': text_sequences}, 
         actions
     ))
     dataset = dataset.shuffle(buffer_size=1000).batch(32)
-
-    # Check for existing preprocessed images before processing
-    if not check_preprocessed_images(service, folder_id):
-        logger.info("No existing preprocessed images found, starting preprocessing...")
-        # Your existing image preprocessing code here
-        process_images(image_paths)
-        # After preprocessing is complete, zip and upload
-        zip_and_upload_preprocessed_images(service, folder_id)
-    else:
-        logger.info("Using existing preprocessed images")
-    
-    logger.info("Starting model training...")
-    # Train the model
     model.fit(dataset, epochs=10)
+    model.save('trained_model.keras')
+    upload_model_to_drive(service, folder_id, 'trained_model.keras')
 
-    logger.info("Training complete. Saving model...")
-    model.save('trained_model.keras')  # Save locally first
-    upload_model_to_drive(service, "14rV_AfSINfFyUQgZN4wJEgGtJCyzlv0a", 'trained_model.keras')
+    # Save preprocessing info
+    preprocessing_info = {
+        'tokenizer': tokenizer,
+        'max_sequence_length': max_sequence_length,
+        'vocab_size': vocab_size,
+        'embedding_dim': embedding_dim
+    }
+    
+    with open('preprocessing_info.pkl', 'wb') as f:
+        pickle.dump(preprocessing_info, f)
+    logger.info("Saved preprocessing information")
+
+    # Upload preprocessing info to Drive
+    file_metadata = {
+        'name': 'preprocessing_info.pkl',
+        'parents': [folder_id]
+    }
+    media = MediaFileUpload('preprocessing_info.pkl',
+                           mimetype='application/octet-stream',
+                           resumable=True)
+    service.files().create(body=file_metadata,
+                          media_body=media,
+                          fields='id').execute()
+    logger.info("Uploaded preprocessing information to Drive")
+    
+    # Clean up local preprocessing file
+    os.remove('preprocessing_info.pkl')
 
     elapsed_time = time.time() - start_time
     logger.info(f"Total execution time: {elapsed_time/60:.2f} minutes")

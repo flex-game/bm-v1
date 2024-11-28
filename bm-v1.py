@@ -61,9 +61,16 @@ def upload_to_drive(service, file_path, folder_id, file_name):
     logger.info(f"Uploaded {file_name} to Drive with ID: {file.get('id')}")
     return file.get('id')
 
+def get_direct_image_url(url):
+    """Convert Google Drive sharing URL to direct download URL."""
+    if "drive.google.com" in url:
+        file_id = url.split('/d/')[-1].split('/')[0]
+        return f"https://drive.google.com/uc?export=view&id={file_id}"
+    return url
+
 def main():
     logger.info("Checking for local model files...")
-    need_model = not os.path.exists('model.keras')
+    need_model = not os.path.exists('trained_model.h5')
     need_tokenizer = not os.path.exists('tokenizer.pickle')
     
     if need_model or need_tokenizer:
@@ -73,7 +80,7 @@ def main():
         if need_model:
             logger.info("Downloading model from Drive...")
             # Download model
-            query = "name='model.keras' and trashed=false"
+            query = "name='trained_model.h5' and trashed=false"
             results = drive_service.files().list(
                 q=query,
                 spaces='drive',
@@ -82,7 +89,7 @@ def main():
             
             files = results.get('files', [])
             if not files:
-                raise FileNotFoundError("model.keras not found in Google Drive")
+                raise FileNotFoundError("trained_model.h5 not found in Google Drive")
             
             model_file_id = files[0]['id']
             request = drive_service.files().get_media(fileId=model_file_id)
@@ -94,7 +101,7 @@ def main():
             model_buffer.seek(0)
             
             # Save model temporarily
-            with open('model.keras', 'wb') as f:
+            with open('trained_model.h5', 'wb') as f:
                 f.write(model_buffer.getvalue())
         
         if need_tokenizer:
@@ -127,7 +134,7 @@ def main():
         logger.info("Using existing local files...")
 
     # Now load the model
-    model = tf.keras.models.load_model('model.keras')
+    model = tf.keras.models.load_model('trained_model.h5')
     
     # Load the tokenizer
     with open('tokenizer.pickle', 'rb') as handle:
@@ -135,6 +142,7 @@ def main():
 
     # Prompt user for image URL
     image_url = input("Please enter the image URL: ")
+    image_url = get_direct_image_url(image_url)  # Convert to direct URL if needed
 
     # Generate text sequence using OpenAI
     frame_prompt_path = 'system_prompts/frame_analysis_system_prompt.txt'
@@ -182,8 +190,8 @@ def main():
     os.remove(text_filename)
     os.remove(image_filename)
     os.remove(prediction_filename)
-    if os.path.exists('model.keras'):
-        os.remove('model.keras')
+    if os.path.exists('trained_model.h5'):
+        os.remove('trained_model.h5')
     if os.path.exists('tokenizer.pickle'):
         os.remove('tokenizer.pickle')
 
