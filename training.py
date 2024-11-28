@@ -11,7 +11,7 @@ import requests
 from io import BytesIO
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseDownload
+from googleapiclient.http import MediaIoBaseDownload, MediaFileUpload
 import io
 import os
 from oauth2client.service_account import ServiceAccountCredentials
@@ -100,6 +100,25 @@ def download_from_drive(service, folder_id, filename):
     
     return output_path
 
+def upload_model_to_drive(service, folder_id, model_path):
+    try:
+        file_metadata = {
+            'name': 'trained_model.h5',
+            'parents': [folder_id]
+        }
+        
+        media = MediaFileUpload(model_path, 
+                              mimetype='application/octet-stream',
+                              resumable=True)
+        
+        file = service.files().create(body=file_metadata,
+                                    media_body=media,
+                                    fields='id').execute()
+        print(f"Model uploaded to Drive with file ID: {file.get('id')}")
+        
+    except Exception as e:
+        print(f"Error uploading model to Drive: {str(e)}")
+
 # Main function to load data, create model, and train
 def main():
     # Download dataset from Google Drive
@@ -124,6 +143,10 @@ def main():
 
     # Train the model
     model.fit(dataset, epochs=10)
+
+    # After training completes, add:
+    model.save('trained_model.h5')  # Save locally first
+    upload_model_to_drive(service, "14rV_AfSINfFyUQgZN4wJEgGtJCyzlv0a", 'trained_model.h5')
 
 if __name__ == "__main__":
     main() 
