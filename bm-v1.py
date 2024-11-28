@@ -68,77 +68,84 @@ def get_direct_image_url(url):
         return f"https://drive.google.com/uc?export=view&id={file_id}"
     return url
 
+def get_preprocessing_info(drive_service):
+    """Download and load preprocessing info from Google Drive."""
+    logger.info("Downloading preprocessing info from Drive...")
+    
+    # Find the preprocessing info file
+    query = "name='preprocessing_info.pkl' and trashed=false"
+    results = drive_service.files().list(
+        q=query,
+        spaces='drive',
+        fields='files(id, name)'
+    ).execute()
+    
+    files = results.get('files', [])
+    if not files:
+        raise FileNotFoundError("preprocessing_info.pkl not found in Google Drive")
+    
+    file_id = files[0]['id']
+    request = drive_service.files().get_media(fileId=file_id)
+    preprocessing_buffer = io.BytesIO()
+    downloader = MediaIoBaseDownload(preprocessing_buffer, request)
+    done = False
+    while not done:
+        _, done = downloader.next_chunk()
+    preprocessing_buffer.seek(0)
+    
+    # Load the preprocessing info
+    preprocessing_info = pickle.load(preprocessing_buffer)
+    logger.info("Successfully loaded preprocessing info")
+    
+    return preprocessing_info
+
 def main():
+    logger.info("Starting initialization...")
+    drive_service = authenticate_gdrive()
+    
+    # Get preprocessing info
+    preprocessing_info = get_preprocessing_info(drive_service)
+    
+    # Extract components
+    tokenizer = preprocessing_info['tokenizer']
+    max_sequence_length = preprocessing_info['max_sequence_length']
+    vocab_size = preprocessing_info['vocab_size']
+    embedding_dim = preprocessing_info['embedding_dim']
+
     logger.info("Checking for local model files...")
     need_model = not os.path.exists('trained_model.h5')
-    need_tokenizer = not os.path.exists('tokenizer.pickle')
     
-    if need_model or need_tokenizer:
-        logger.info("Some files missing locally. Initializing Google Drive connection...")
-        drive_service = authenticate_gdrive()
+    if need_model:
+        logger.info("Model file missing locally. Downloading from Drive...")
+        # Download model
+        query = "name='trained_model.h5' and trashed=false"
+        results = drive_service.files().list(
+            q=query,
+            spaces='drive',
+            fields='files(id, name)'
+        ).execute()
         
-        if need_model:
-            logger.info("Downloading model from Drive...")
-            # Download model
-            query = "name='trained_model.h5' and trashed=false"
-            results = drive_service.files().list(
-                q=query,
-                spaces='drive',
-                fields='files(id, name)'
-            ).execute()
-            
-            files = results.get('files', [])
-            if not files:
-                raise FileNotFoundError("trained_model.h5 not found in Google Drive")
-            
-            model_file_id = files[0]['id']
-            request = drive_service.files().get_media(fileId=model_file_id)
-            model_buffer = io.BytesIO()
-            downloader = MediaIoBaseDownload(model_buffer, request)
-            done = False
-            while not done:
-                _, done = downloader.next_chunk()
-            model_buffer.seek(0)
-            
-            # Save model temporarily
-            with open('trained_model.h5', 'wb') as f:
-                f.write(model_buffer.getvalue())
+        files = results.get('files', [])
+        if not files:
+            raise FileNotFoundError("trained_model.h5 not found in Google Drive")
         
-        if need_tokenizer:
-            logger.info("Downloading tokenizer from Drive...")
-            # Download tokenizer
-            query = "name='tokenizer.pickle' and trashed=false"
-            results = drive_service.files().list(
-                q=query,
-                spaces='drive',
-                fields='files(id, name)'
-            ).execute()
-            
-            files = results.get('files', [])
-            if not files:
-                raise FileNotFoundError("tokenizer.pickle not found in Google Drive")
-            
-            tokenizer_file_id = files[0]['id']
-            request = drive_service.files().get_media(fileId=tokenizer_file_id)
-            tokenizer_buffer = io.BytesIO()
-            downloader = MediaIoBaseDownload(tokenizer_buffer, request)
-            done = False
-            while not done:
-                _, done = downloader.next_chunk()
-            tokenizer_buffer.seek(0)
-            
-            # Save tokenizer temporarily
-            with open('tokenizer.pickle', 'wb') as f:
-                f.write(tokenizer_buffer.getvalue())
+        model_file_id = files[0]['id']
+        request = drive_service.files().get_media(fileId=model_file_id)
+        model_buffer = io.BytesIO()
+        downloader = MediaIoBaseDownload(model_buffer, request)
+        done = False
+        while not done:
+            _, done = downloader.next_chunk()
+        model_buffer.seek(0)
+        
+        # Save model temporarily
+        with open('trained_model.h5', 'wb') as f:
+            f.write(model_buffer.getvalue())
     else:
         logger.info("Using existing local files...")
 
     # Now load the model
     model = tf.keras.models.load_model('trained_model.h5')
-    
-    # Load the tokenizer
-    with open('tokenizer.pickle', 'rb') as handle:
-        tokenizer = pickle.load(handle)
 
     # Prompt user for image URL
     image_url = input("Please enter the image URL: ")
@@ -168,12 +175,10 @@ def main():
 
     # Upload text and image to Google Drive
     usage_logs_folder_id = '1NMIZXKWUxAX428xNfTl36fjZiryqyWDZ'
-    drive_service = authenticate_gdrive()
     upload_to_drive(drive_service, text_filename, usage_logs_folder_id, text_filename)
     upload_to_drive(drive_service, image_filename, usage_logs_folder_id, image_filename)
 
     # Preprocess the input
-    max_sequence_length = 50  # Ensure this matches the training setup
     input_data = preprocess_input(raw_text, image_url, tokenizer, max_sequence_length)
 
     # Predict actions
@@ -192,8 +197,6 @@ def main():
     os.remove(prediction_filename)
     if os.path.exists('trained_model.h5'):
         os.remove('trained_model.h5')
-    if os.path.exists('tokenizer.pickle'):
-        os.remove('tokenizer.pickle')
 
     logger.info("Process complete.")
 
