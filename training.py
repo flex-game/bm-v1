@@ -16,6 +16,12 @@ import io
 import os
 from oauth2client.service_account import ServiceAccountCredentials
 from dotenv import load_dotenv
+import logging
+import time
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 # Load and preprocess the dataset
 def load_and_preprocess_data(csv_path, max_sequence_length=50, num_words=10000):
@@ -29,6 +35,7 @@ def load_and_preprocess_data(csv_path, max_sequence_length=50, num_words=10000):
 
     # Image preprocessing
     def preprocess_image_from_url(url, target_size=(224, 224)):
+        logger.info("Starting image preprocessing for url: " + url)
         response = requests.get(url)
         img = load_img(BytesIO(response.content), target_size=target_size)
         img_array = img_to_array(img)
@@ -41,6 +48,7 @@ def load_and_preprocess_data(csv_path, max_sequence_length=50, num_words=10000):
     # Action labels
     actions = df.drop(columns=['image_path', 'stats_shot']).values
 
+    logger.info("Image preprocessing complete")
     return images, padded_sequences, actions, tokenizer
 
 # Create the multi-modal model
@@ -75,6 +83,7 @@ def setup_google_drive():
     return service
 
 def download_from_drive(service, folder_id, filename):
+    logger.info(f"Starting download of {filename} from Drive...")
     # Search for the file in the specified folder
     query = f"'{folder_id}' in parents and name='{filename}'"
     results = service.files().list(q=query, spaces='drive').execute()
@@ -98,6 +107,7 @@ def download_from_drive(service, folder_id, filename):
     with open(output_path, 'wb') as f:
         f.write(fh.getvalue())
     
+    logger.info(f"Finished downloading {filename}")
     return output_path
 
 def upload_model_to_drive(service, folder_id, model_path):
@@ -125,11 +135,17 @@ def upload_model_to_drive(service, folder_id, model_path):
 
 # Main function to load data, create model, and train
 def main():
-    # Download dataset from Google Drive
+    start_time = time.time()
+    logger.info("Starting initialization...")
+    
+    logger.info("Setting up Google Drive connection...")
     service = setup_google_drive()
+    
+    logger.info("Downloading dataset from Drive...")
     folder_id = "14rV_AfSINfFyUQgZN4wJEgGtJCyzlv0a"
     csv_path = download_from_drive(service, folder_id, 'dataset.csv')
     
+    logger.info("Loading and preprocessing dataset...")
     images, text_sequences, actions, tokenizer = load_and_preprocess_data(csv_path)
 
     vocab_size = len(tokenizer.word_index) + 1
@@ -145,12 +161,16 @@ def main():
     ))
     dataset = dataset.shuffle(buffer_size=1000).batch(32)
 
+    logger.info("Starting model training...")
     # Train the model
     model.fit(dataset, epochs=10)
 
-    # After training completes:
+    logger.info("Training complete. Saving model...")
     model.save('trained_model.h5')  # Save locally first
     upload_model_to_drive(service, "14rV_AfSINfFyUQgZN4wJEgGtJCyzlv0a", 'trained_model.h5')
+
+    elapsed_time = time.time() - start_time
+    logger.info(f"Total execution time: {elapsed_time/60:.2f} minutes")
 
 if __name__ == "__main__":
     main() 
