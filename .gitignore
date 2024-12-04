@@ -162,3 +162,8 @@ cython_debug/
 #.idea/
 preprocessing_info.pkl
 trained_model.h5
+model.tar.gz
+saved_model/fingerprint.pb
+saved_model/saved_model.pb
+saved_model/variables/variables.data-00000-of-00001
+saved_model/variables/variables.index
