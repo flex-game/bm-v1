@@ -4,8 +4,8 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
 from oauth2client.service_account import ServiceAccountCredentials
 from dotenv import load_dotenv
-from gdrive_utils import authenticate_gdrive, list_jpg_files, create_folder, upload_text_content
-from openai_utils import generate_frame_description, generate_action_description
+from utils.creates_dataset import authenticate_gdrive, list_jpg_files, create_folder, upload_text_content
+from utils.creates_dataset import generate_frame_description, generate_action_description
 import base64
 import re
 from openai import OpenAI
@@ -295,7 +295,7 @@ if __name__ == "__main__":
     actions_folder_id = folder_ids['actions_analysis']
     
     # Updated system prompt paths
-    frame_prompt_path = 'system_prompts/frame_analysis_system_prompt.txt'
-    action_prompt_path = 'system_prompts/action_analysis_system_prompt.txt'
+    frame_prompt_path = 'utils/oai_system_prompts/frame_analysis_system_prompt.txt'
+    action_prompt_path = 'utils/oai_system_prompts/action_analysis_system_prompt.txt'
     
     process_frames(frames_folder_id, analysis_folder_id, actions_folder_id, frame_prompt_path, action_prompt_path)
