@@ -15,37 +15,24 @@ from utils.create_text_data import generate_frame_description
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-def get_preprocessing_info(endpoint_name):
-    """Fetch preprocessing info from the SageMaker endpoint."""
-    logger.info("Fetching preprocessing info from SageMaker endpoint...")
-    
-    runtime = boto3.client('sagemaker-runtime')
-    
-    # Make a request to get preprocessing info
-    # We'll use a special flag in the request to indicate we want preprocessing info
-    payload = {
-        "request_type": "get_preprocessing_info"
-    }
-    
-    response = runtime.invoke_endpoint(
-        EndpointName=endpoint_name,
-        ContentType='application/json',
-        Body=json.dumps(payload)
-    )
-    
-    preprocessing_info = json.loads(response['Body'].read())
-    return preprocessing_info
-
-def predict_with_endpoint(endpoint_name, image_data):
+def predict_with_endpoint(endpoint_name, image_data, text_content):
     """Make predictions using the SageMaker endpoint."""
     logger.info("Making prediction with SageMaker endpoint...")
     
     runtime = boto3.client('sagemaker-runtime')
     
-    # Prepare the payload
+    # Instead of getting from endpoint, get these values from config/env vars
+    max_sequence_length = int(os.getenv('MAX_SEQUENCE_LENGTH', 512))  # example default
+    
+    # Note: You'll need to handle tokenizer and action_mapping differently
+    # as they're more complex than simple values
+    
+    # Rest of your prediction logic...
     payload = {
-        "request_type": "prediction",
-        "image_data": image_data.tolist()  # Convert numpy array to list for JSON serialization
+        "instances": [{
+            "image_input": image_data.tolist(),
+            "text_input": padded_text[0].tolist()
+        }]
     }
     
     # Make prediction request
@@ -57,7 +44,7 @@ def predict_with_endpoint(endpoint_name, image_data):
     
     # Parse response
     prediction = json.loads(response['Body'].read())
-    return prediction
+    return prediction['predictions']
 
 def preprocess_input(image_url):
     """Preprocess the input image for prediction."""
@@ -81,10 +68,6 @@ def main():
     endpoint_name = os.getenv('SAGEMAKER_ENDPOINT_NAME')
     if not endpoint_name:
         raise ValueError("SAGEMAKER_ENDPOINT_NAME environment variable not set")
-    
-    # Get preprocessing info from the endpoint
-    preprocessing_info = get_preprocessing_info(endpoint_name)
-    action_mapping = preprocessing_info['action_mapping']
     
     # Get image URL from user
     image_url = input("Please enter the image URL: ")
