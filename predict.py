@@ -69,6 +69,7 @@ def main():
     
     # Get the endpoint name from environment variable
     endpoint_name = os.getenv('SAGEMAKER_ENDPOINT_NAME')
+    logger.info(f"Using endpoint: {endpoint_name}")
     if not endpoint_name:
         raise ValueError("SAGEMAKER_ENDPOINT_NAME environment variable not set")
     
