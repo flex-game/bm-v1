@@ -28,8 +28,8 @@ def predict_with_endpoint(endpoint_name, image_data, text_content):
         
         payload = {
             "instances": [{
-                "serving_default_input_layer": image_data.tolist(),
-                "serving_default_input_layer_2": padded_text[0].tolist()
+                "inputs": image_data.tolist(),
+                "inputs_1": padded_text[0].tolist()
             }]
         }
         
