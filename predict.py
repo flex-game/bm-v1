@@ -1,6 +1,3 @@
-from dotenv import load_dotenv
-load_dotenv()  # Load environment variables from .env file
-
 import os
 import numpy as np
 import tensorflow as tf
@@ -14,6 +11,9 @@ import json
 import boto3
 from utils.create_text_data import generate_frame_description
 from utils.text_preprocessing import preprocess_texts
+from dotenv import load_dotenv
+
+load_dotenv()  # Load environment variables from .env file
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')

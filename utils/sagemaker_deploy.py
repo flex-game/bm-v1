@@ -10,21 +10,29 @@ def convert_h5_to_saved_model(h5_path, saved_model_dir, preprocessing_info_path)
     # Load the .h5 model
     model = tf.keras.models.load_model(h5_path)
     
-    # Create a new model that includes the base
-    inputs = [tf.keras.Input(shape=input.shape[1:], name=input.name.split(':')[0]) 
-              for input in model.inputs]
-    outputs = model(inputs)
-    new_model = tf.keras.Model(inputs=inputs, outputs=outputs)
+    # Force the model to build and initialize all variables
+    dummy_inputs = [tf.zeros((1,) + input.shape[1:]) for input in model.inputs]
+    _ = model(dummy_inputs)  # This will initialize all variables
     
-    # Save with explicit signatures
+    # Save the model with tracking enabled
+    options = tf.saved_model.SaveOptions(
+        experimental_custom_gradients=False,
+        save_debug_info=True,
+        function_aliases={},
+        trace_skipped_signatures=True
+    )
+    
+    # Save with explicit input names
     signatures = {
-        'serving_default': tf.function(lambda x: new_model(x)).get_concrete_function(
-            [tf.TensorSpec(input.shape, tf.float32, name=input.name.split(':')[0]) 
-             for input in model.inputs]
+        'serving_default': model.call.get_concrete_function(
+            *[tf.TensorSpec(shape=(None,) + input.shape[1:], 
+                           dtype=tf.float32, 
+                           name=input.name.split(':')[0]) 
+              for input in model.inputs]
         )
     }
     
-    tf.saved_model.save(new_model, saved_model_dir, signatures=signatures)
+    tf.saved_model.save(model, saved_model_dir, signatures=signatures, options=options)
     
     # Create tar.gz file with correct SageMaker structure
     with tarfile.open('model.tar.gz', 'w:gz') as tar:
