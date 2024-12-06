@@ -10,38 +10,35 @@ def convert_h5_to_saved_model(h5_path, saved_model_dir, preprocessing_info_path)
     # Load the .h5 model
     model = tf.keras.models.load_model(h5_path)
     
-    # Force the model to build and initialize all variables
-    dummy_inputs = [tf.zeros((1,) + input.shape[1:]) for input in model.inputs]
-    _ = model(dummy_inputs)  # This will initialize all variables
+    # Debug prints
+    print("Model summary:")
+    model.summary()
+    print("\nModel inputs:", model.inputs)
+    print("\nModel outputs:", model.outputs)
     
-    # Save the model with tracking enabled
-    options = tf.saved_model.SaveOptions(
-        experimental_custom_gradients=False,
-        save_debug_info=True,
-        function_aliases={},
-        trace_skipped_signatures=True
-    )
+    # After loading model
+    resnet_layers = [layer for layer in model.layers if 'resnet' in layer.name.lower()]
+    print(f"\nFound {len(resnet_layers)} ResNet layers")
+    print("First few ResNet layers:", [l.name for l in resnet_layers[:5]])
     
-    # Save with explicit input names
-    signatures = {
-        'serving_default': model.call.get_concrete_function(
-            *[tf.TensorSpec(shape=(None,) + input.shape[1:], 
-                           dtype=tf.float32, 
-                           name=input.name.split(':')[0]) 
-              for input in model.inputs]
-        )
-    }
+    # Force eager execution of the model to initialize all variables
+    dummy_image = tf.zeros((1, 224, 224, 3))
+    dummy_text = tf.zeros((1, 50))
+    _ = model([dummy_image, dummy_text], training=False)
     
-    tf.saved_model.save(model, saved_model_dir, signatures=signatures, options=options)
+    # Freeze ResNet50
+    model.get_layer('resnet50').trainable = False
     
-    # Create tar.gz file with correct SageMaker structure
+    # Save with simpler options
+    options = tf.saved_model.SaveOptions(experimental_custom_gradients=False)
+    tf.saved_model.save(model, saved_model_dir, options=options)
+    
+    # Create tar.gz file
     with tarfile.open('model.tar.gz', 'w:gz') as tar:
-        # Add all contents from saved_model_dir into model/1/
         for item in os.listdir(saved_model_dir):
             item_path = os.path.join(saved_model_dir, item)
             arcname = os.path.join('model/1', item)
             tar.add(item_path, arcname=arcname)
-        # Add preprocessing info at root level
         tar.add(preprocessing_info_path, arcname='preprocessing_info.pkl')
     
     return 'model.tar.gz'
@@ -80,6 +77,6 @@ def inspect_tarfile(tar_path):
             print(f"- {member.name}")
 
 if __name__ == "__main__":
-    # convert_h5_to_saved_model('trained_model.h5', 'saved_model', 'preprocessing_info.pkl')
-    # inspect_tarfile('model.tar.gz')
+    convert_h5_to_saved_model('trained_model.h5', 'saved_model', 'preprocessing_info.pkl')
+    inspect_tarfile('model.tar.gz')
     deploy_model_to_sagemaker()
