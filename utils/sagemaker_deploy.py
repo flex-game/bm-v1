@@ -17,74 +17,48 @@ def convert_h5_to_saved_model(h5_path, saved_model_dir, preprocessing_info_path)
     print(f"Saving to: {saved_model_dir}")
     print(f"Preprocessing info at: {preprocessing_info_path}")
     
-    # Load the .h5 model
+    print("Loading original model...")
     model = tf.keras.models.load_model(h5_path)
     
-    # Debug prints
-    print("Model summary:")
-    model.summary()
-    print("\nModel inputs:", model.inputs)
-    print("\nModel outputs:", model.outputs)
-    
-    # Get the ResNet50 layer and reinitialize it
-    print("\nReinitializing ResNet50 weights...")
-    resnet = model.get_layer('resnet50')
-    
-    # Create a fresh ResNet50 with ImageNet weights
-    base_model = tf.keras.applications.ResNet50(
+    print("\nCreating fresh ResNet50...")
+    fresh_resnet = tf.keras.applications.ResNet50(
         weights='imagenet',
         include_top=False,
         pooling='avg'
     )
     
-    # Copy weights layer by layer, with special handling for batch norm
-    for layer in resnet.layers:
-        try:
-            # Try to find matching layer
-            matching_layer = None
-            layer_name = layer.name
-            
-            try:
-                matching_layer = base_model.get_layer(layer_name)
-            except:
-                # Try without _1 suffix
-                clean_name = layer_name.replace('_1', '')
-                try:
-                    matching_layer = base_model.get_layer(clean_name)
-                except:
-                    print(f"? No matching layer found for: {layer_name}")
-                    continue
-            
-            # Get weights from base model
-            base_weights = matching_layer.get_weights()
-            
-            # Special handling for batch normalization layers
-            if isinstance(layer, tf.keras.layers.BatchNormalization):
-                # Ensure all batch norm variables are copied
-                layer.gamma.assign(base_weights[0])  # scale
-                layer.beta.assign(base_weights[1])   # offset
-                layer.moving_mean.assign(base_weights[2])
-                layer.moving_variance.assign(base_weights[3])
-                print(f"✓ Copied batch norm weights for: {layer_name}")
-            else:
-                # Regular weight copying
-                layer.set_weights(base_weights)
-                print(f"✓ Copied weights for: {layer_name}")
-                
-        except Exception as e:
-            print(f"✗ Failed to copy weights for layer: {layer_name}")
-            print(f"  Error: {str(e)}")
+    # Freeze the ResNet weights
+    fresh_resnet.trainable = False
     
-    # Force initialization with dummy data
+    print("\nRebuilding model with fresh ResNet...")
+    # Get the non-ResNet layers from original model
+    embedding = model.get_layer('embedding')
+    lstm = model.get_layer('lstm')
+    dense = model.get_layer('dense')
+    
+    # Create new inputs
+    image_input = tf.keras.Input(shape=(224, 224, 3), name='input_layer')
+    text_input = tf.keras.Input(shape=(50,), name='input_layer_2')
+    
+    # Build new model
+    x1 = fresh_resnet(image_input)
+    x2 = embedding(text_input)
+    x2 = lstm(x2)
+    x = tf.keras.layers.Concatenate()([x1, x2])
+    outputs = dense(x)
+    
+    new_model = tf.keras.Model(inputs=[image_input, text_input], outputs=outputs)
+    
+    # Force initialization
     print("\nForcing initialization...")
     dummy_image = tf.zeros((1, 224, 224, 3))
     dummy_text = tf.zeros((1, 50))
-    _ = model([dummy_image, dummy_text], training=False)
+    _ = new_model([dummy_image, dummy_text], training=False)
     
     # Save with explicit variable tracking
     print("\nSaving model...")
     tf.saved_model.save(
-        model, 
+        new_model, 
         saved_model_dir,
         options=tf.saved_model.SaveOptions(
             experimental_custom_gradients=False,
