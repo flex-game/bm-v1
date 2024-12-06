@@ -10,8 +10,8 @@ def convert_h5_to_saved_model(h5_path, saved_model_dir, preprocessing_info_path)
     # Load the .h5 model
     model = tf.keras.models.load_model(h5_path)
     
-    # Save as SavedModel format
-    tf.saved_model.save(model, saved_model_dir)
+    # Make sure the ResNet50 base is included in the SavedModel
+    model.save(saved_model_dir, include_optimizer=False, save_format='tf')
     
     # Create tar.gz file with correct SageMaker structure
     with tarfile.open('model.tar.gz', 'w:gz') as tar:
