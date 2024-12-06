@@ -37,19 +37,45 @@ def convert_h5_to_saved_model(h5_path, saved_model_dir, preprocessing_info_path)
         pooling='avg'
     )
     
-    # Copy weights layer by layer
+    # Copy weights layer by layer, handling nested names
     for layer in resnet.layers:
         try:
-            matching_layer = base_model.get_layer(layer.name)
-            layer.set_weights(matching_layer.get_weights())
-            print(f"✓ Copied weights for layer: {layer.name}")
+            # Try direct name first
+            matching_layer = None
+            try:
+                matching_layer = base_model.get_layer(layer.name)
+            except:
+                # Try without _1 suffix
+                clean_name = layer.name.replace('_1', '')
+                matching_layer = base_model.get_layer(clean_name)
+            
+            if matching_layer:
+                weights = matching_layer.get_weights()
+                layer.set_weights(weights)
+                print(f"✓ Copied weights for layer: {layer.name} (from {matching_layer.name})")
+            else:
+                print(f"? No matching layer found for: {layer.name}")
+                
         except Exception as e:
             print(f"✗ Failed to copy weights for layer: {layer.name}")
             print(f"  Error: {str(e)}")
     
-    # Save the model
+    # Force initialization
+    print("\nForcing initialization...")
+    dummy_image = tf.zeros((1, 224, 224, 3))
+    dummy_text = tf.zeros((1, 50))
+    _ = model([dummy_image, dummy_text], training=False)
+    
+    # Save with explicit tracking
     print("\nSaving model...")
-    tf.saved_model.save(model, saved_model_dir)
+    tf.saved_model.save(
+        model, 
+        saved_model_dir,
+        options=tf.saved_model.SaveOptions(
+            experimental_custom_gradients=False,
+            save_debug_info=True
+        )
+    )
     
     # Create tar.gz file
     print("\nCreating tar.gz file...")
