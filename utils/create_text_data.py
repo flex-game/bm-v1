@@ -16,7 +16,7 @@ def generate_frame_description(image_url, prompt_file_path):
     system_prompt = load_system_prompt(prompt_file_path)
 
     response = client.chat.completions.create(
-        model="gpt-4-vision-preview",
+        model="gpt-4o-mini",
         messages=[
             {
                 "role": "system",
@@ -48,7 +48,7 @@ def generate_action_description(image_url1, image_url2, prompt_file_path):
     system_prompt = load_system_prompt(prompt_file_path)
 
     response = client.chat.completions.create(
-        model="gpt-4-vision-preview",
+        model="gpt-4o-mini",
         messages=[
             {
                 "role": "system",
