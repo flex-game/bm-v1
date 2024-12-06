@@ -18,34 +18,42 @@ logger = logging.getLogger(__name__)
 
 def predict_with_endpoint(endpoint_name, image_data, text_content):
     """Make predictions using the SageMaker endpoint."""
-    logger.info("Making prediction with SageMaker endpoint...")
-    
-    runtime = boto3.client('sagemaker-runtime')
-    
-    # Instead of getting from endpoint, get these values from config/env vars
-    max_sequence_length = int(os.getenv('MAX_SEQUENCE_LENGTH', 512))  # example default
-    
-    # Preprocess the text content
-    padded_text = preprocess_texts([text_content], max_sequence_length)
-    
-    # Modified payload structure - using the exact input names expected by the model
-    payload = {
-        "instances": [{
-            "input_1": image_data.tolist(),  # Changed from "image_input"
-            "input_2": padded_text[0].tolist()  # Changed from "text_input"
-        }]
-    }
-    
-    # Make prediction request
-    response = runtime.invoke_endpoint(
-        EndpointName=endpoint_name,
-        ContentType='application/json',
-        Body=json.dumps(payload)
-    )
-    
-    # Parse response
-    prediction = json.loads(response['Body'].read())
-    return prediction['predictions']
+    try:
+        logger.info("Making prediction with SageMaker endpoint...")
+        
+        runtime = boto3.client('sagemaker-runtime')
+        
+        # Instead of getting from endpoint, get these values from config/env vars
+        max_sequence_length = int(os.getenv('MAX_SEQUENCE_LENGTH', 512))  # example default
+        
+        # Preprocess the text content
+        padded_text = preprocess_texts([text_content], max_sequence_length)
+        
+        # Modified payload structure to match the model's input layer names
+        payload = {
+            "instances": [{
+                "input_layer": image_data.tolist(),    # Changed to match training model
+                "input_layer_2": padded_text[0].tolist()  # Changed to match training model
+            }]
+        }
+        
+        # Add debug logging for the payload
+        logger.info(f"Sending payload: {json.dumps(payload, indent=2)}")
+        
+        response = runtime.invoke_endpoint(
+            EndpointName=endpoint_name,
+            ContentType='application/json',
+            Body=json.dumps(payload)
+        )
+        
+        prediction = json.loads(response['Body'].read())
+        return prediction
+    except Exception as e:
+        logger.error(f"Full error response: {str(e)}")
+        # If it's a boto3 error, it might have a response field
+        if hasattr(e, 'response'):
+            logger.error(f"Error response body: {e.response.get('Body', '').read()}")
+        raise
 
 def preprocess_input(image_url):
     """Preprocess the input image for prediction."""
