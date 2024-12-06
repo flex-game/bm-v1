@@ -7,6 +7,16 @@ import tarfile
 import boto3
 
 def convert_h5_to_saved_model(h5_path, saved_model_dir, preprocessing_info_path):
+    # Use absolute paths
+    root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    h5_path = os.path.join(root_dir, h5_path)
+    saved_model_dir = os.path.join(root_dir, saved_model_dir)
+    preprocessing_info_path = os.path.join(root_dir, preprocessing_info_path)
+    
+    print(f"Loading model from: {h5_path}")
+    print(f"Saving to: {saved_model_dir}")
+    print(f"Preprocessing info at: {preprocessing_info_path}")
+    
     # Load the .h5 model
     model = tf.keras.models.load_model(h5_path)
     
@@ -16,24 +26,33 @@ def convert_h5_to_saved_model(h5_path, saved_model_dir, preprocessing_info_path)
     print("\nModel inputs:", model.inputs)
     print("\nModel outputs:", model.outputs)
     
-    # After loading model
-    resnet_layers = [layer for layer in model.layers if 'resnet' in layer.name.lower()]
-    print(f"\nFound {len(resnet_layers)} ResNet layers")
-    print("First few ResNet layers:", [l.name for l in resnet_layers[:5]])
+    # Get the ResNet50 layer and reinitialize it
+    print("\nReinitializing ResNet50 weights...")
+    resnet = model.get_layer('resnet50')
     
-    # Force eager execution of the model to initialize all variables
-    dummy_image = tf.zeros((1, 224, 224, 3))
-    dummy_text = tf.zeros((1, 50))
-    _ = model([dummy_image, dummy_text], training=False)
+    # Create a fresh ResNet50 with ImageNet weights
+    base_model = tf.keras.applications.ResNet50(
+        weights='imagenet',
+        include_top=False,
+        pooling='avg'
+    )
     
-    # Freeze ResNet50
-    model.get_layer('resnet50').trainable = False
+    # Copy weights layer by layer
+    for layer in resnet.layers:
+        try:
+            matching_layer = base_model.get_layer(layer.name)
+            layer.set_weights(matching_layer.get_weights())
+            print(f"✓ Copied weights for layer: {layer.name}")
+        except Exception as e:
+            print(f"✗ Failed to copy weights for layer: {layer.name}")
+            print(f"  Error: {str(e)}")
     
-    # Save with simpler options
-    options = tf.saved_model.SaveOptions(experimental_custom_gradients=False)
-    tf.saved_model.save(model, saved_model_dir, options=options)
+    # Save the model
+    print("\nSaving model...")
+    tf.saved_model.save(model, saved_model_dir)
     
     # Create tar.gz file
+    print("\nCreating tar.gz file...")
     with tarfile.open('model.tar.gz', 'w:gz') as tar:
         for item in os.listdir(saved_model_dir):
             item_path = os.path.join(saved_model_dir, item)
@@ -46,29 +65,39 @@ def convert_h5_to_saved_model(h5_path, saved_model_dir, preprocessing_info_path)
 def deploy_model_to_sagemaker():
     # Get the SageMaker execution role
     role = "arn:aws:iam::130323730979:role/SageMakerStandardAllAccessRole"
-
-    # Define the S3 path where your model is stored
-    model_data = 's3://bm-v1-bucket/model.tar.gz'
-
+    
+    bucket = 'bm-v1-bucket'
+    key = 'model.tar.gz'
+    s3_client = boto3.client('s3')
+    
+    # Verify the model in S3
+    response = s3_client.head_object(Bucket=bucket, Key=key)
+    print("\nVerifying S3 model:")
+    print(f"Last modified: {response['LastModified']}")
+    print(f"Size: {response['ContentLength']/1024/1024:.2f} MB")
+    
+    model_data = f's3://{bucket}/{key}'
+    print(f"Using model from: {model_data}")
+    
     # Create a TensorFlowModel object
     model = TensorFlowModel(
         model_data=model_data,
         role=role,
-        framework_version='2.16.1',  # Updated to match training version
+        framework_version='2.16.1',
         env={
             'SAGEMAKER_TFS_NGINX_LOGLEVEL': 'info',
             'SAGEMAKER_TFS_WORKER_TIMEOUT_SECS': '300'
         },
         sagemaker_session=sagemaker.Session()
     )
-
-    # Deploy the model to an endpoint
+    
+    # Deploy the model
     predictor = model.deploy(
         initial_instance_count=1,
-        instance_type='ml.m5.large'  # Choose an appropriate instance type
+        instance_type='ml.m5.large'
     )
-
-    print("Model deployed successfully. Endpoint name:", predictor.endpoint_name)
+    
+    print("\nModel deployed successfully. Endpoint name:", predictor.endpoint_name)
 
 def inspect_tarfile(tar_path):
     with tarfile.open(tar_path, 'r:gz') as tar:
