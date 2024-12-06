@@ -1,3 +1,6 @@
+from dotenv import load_dotenv
+load_dotenv()  # Load environment variables from .env file
+
 import os
 import numpy as np
 import tensorflow as tf
@@ -69,7 +72,7 @@ def main():
     
     # Get the endpoint name from environment variable
     endpoint_name = os.getenv('SAGEMAKER_ENDPOINT_NAME')
-    logger.info(f"Using endpoint: {endpoint_name}")
+    print(f"Loaded endpoint name: {endpoint_name}")  # Debug print
     if not endpoint_name:
         raise ValueError("SAGEMAKER_ENDPOINT_NAME environment variable not set")
     
