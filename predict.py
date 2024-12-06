@@ -10,6 +10,7 @@ from io import BytesIO
 import json
 import boto3
 from utils.create_text_data import generate_frame_description
+from utils.text_preprocessing import preprocess_texts
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -80,10 +81,7 @@ def main():
     image_data = preprocess_input(image_url)
     
     # Get predictions from the endpoint
-    prediction_response = predict_with_endpoint(endpoint_name, {
-        'image_data': image_data.tolist(),
-        'text_data': text_content
-    })
+    prediction_response = predict_with_endpoint(endpoint_name, image_data, text_content)
     predicted_actions = prediction_response['predictions']
     
     # Print predictions

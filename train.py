@@ -20,6 +20,7 @@ import logging
 import time
 import zipfile
 import pickle
+from utils.text_preprocessing import preprocess_texts
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
@@ -30,10 +31,7 @@ def load_and_preprocess_data(csv_path, max_sequence_length=50, num_words=10000):
     df = pd.read_csv(csv_path)
 
     # Text preprocessing
-    tokenizer = Tokenizer(num_words=num_words)
-    tokenizer.fit_on_texts(df['stats_shot'])
-    sequences = tokenizer.texts_to_sequences(df['stats_shot'])
-    padded_sequences = pad_sequences(sequences, padding='post', maxlen=max_sequence_length)
+    padded_sequences, tokenizer = preprocess_texts(df['stats_shot'], num_words, max_sequence_length)
 
     # Image preprocessing
     def preprocess_image_from_url(url, target_size=(224, 224)):
