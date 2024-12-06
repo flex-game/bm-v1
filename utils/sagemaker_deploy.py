@@ -37,36 +37,51 @@ def convert_h5_to_saved_model(h5_path, saved_model_dir, preprocessing_info_path)
         pooling='avg'
     )
     
-    # Copy weights layer by layer, handling nested names
+    # Copy weights layer by layer, with special handling for batch norm
     for layer in resnet.layers:
         try:
-            # Try direct name first
+            # Try to find matching layer
             matching_layer = None
+            layer_name = layer.name
+            
             try:
-                matching_layer = base_model.get_layer(layer.name)
+                matching_layer = base_model.get_layer(layer_name)
             except:
                 # Try without _1 suffix
-                clean_name = layer.name.replace('_1', '')
-                matching_layer = base_model.get_layer(clean_name)
+                clean_name = layer_name.replace('_1', '')
+                try:
+                    matching_layer = base_model.get_layer(clean_name)
+                except:
+                    print(f"? No matching layer found for: {layer_name}")
+                    continue
             
-            if matching_layer:
-                weights = matching_layer.get_weights()
-                layer.set_weights(weights)
-                print(f"✓ Copied weights for layer: {layer.name} (from {matching_layer.name})")
+            # Get weights from base model
+            base_weights = matching_layer.get_weights()
+            
+            # Special handling for batch normalization layers
+            if isinstance(layer, tf.keras.layers.BatchNormalization):
+                # Ensure all batch norm variables are copied
+                layer.gamma.assign(base_weights[0])  # scale
+                layer.beta.assign(base_weights[1])   # offset
+                layer.moving_mean.assign(base_weights[2])
+                layer.moving_variance.assign(base_weights[3])
+                print(f"✓ Copied batch norm weights for: {layer_name}")
             else:
-                print(f"? No matching layer found for: {layer.name}")
+                # Regular weight copying
+                layer.set_weights(base_weights)
+                print(f"✓ Copied weights for: {layer_name}")
                 
         except Exception as e:
-            print(f"✗ Failed to copy weights for layer: {layer.name}")
+            print(f"✗ Failed to copy weights for layer: {layer_name}")
             print(f"  Error: {str(e)}")
     
-    # Force initialization
+    # Force initialization with dummy data
     print("\nForcing initialization...")
     dummy_image = tf.zeros((1, 224, 224, 3))
     dummy_text = tf.zeros((1, 50))
     _ = model([dummy_image, dummy_text], training=False)
     
-    # Save with explicit tracking
+    # Save with explicit variable tracking
     print("\nSaving model...")
     tf.saved_model.save(
         model, 
@@ -96,7 +111,15 @@ def deploy_model_to_sagemaker():
     key = 'model.tar.gz'
     s3_client = boto3.client('s3')
     
-    # Verify the model in S3
+    # Upload the new model to S3
+    root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    local_tar_path = os.path.join(root_dir, 'model.tar.gz')
+    print(f"\nUploading new model to S3...")
+    print(f"From: {local_tar_path}")
+    print(f"To: s3://{bucket}/{key}")
+    s3_client.upload_file(local_tar_path, bucket, key)
+    
+    # Verify the upload
     response = s3_client.head_object(Bucket=bucket, Key=key)
     print("\nVerifying S3 model:")
     print(f"Last modified: {response['LastModified']}")
@@ -105,7 +128,7 @@ def deploy_model_to_sagemaker():
     model_data = f's3://{bucket}/{key}'
     print(f"Using model from: {model_data}")
     
-    # Create a TensorFlowModel object
+    # Create and deploy model
     model = TensorFlowModel(
         model_data=model_data,
         role=role,
@@ -113,11 +136,9 @@ def deploy_model_to_sagemaker():
         env={
             'SAGEMAKER_TFS_NGINX_LOGLEVEL': 'info',
             'SAGEMAKER_TFS_WORKER_TIMEOUT_SECS': '300'
-        },
-        sagemaker_session=sagemaker.Session()
+        }
     )
     
-    # Deploy the model
     predictor = model.deploy(
         initial_instance_count=1,
         instance_type='ml.m5.large'
