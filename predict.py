@@ -23,22 +23,17 @@ def predict_with_endpoint(endpoint_name, image_data, text_content):
         
         runtime = boto3.client('sagemaker-runtime')
         
-        # Instead of getting from endpoint, get these values from config/env vars
-        max_sequence_length = int(os.getenv('MAX_SEQUENCE_LENGTH', 512))  # example default
-        
-        # Preprocess the text content
+        max_sequence_length = int(os.getenv('MAX_SEQUENCE_LENGTH', 512))
         padded_text = preprocess_texts([text_content], max_sequence_length)
         
-        # Modified payload structure to match the model's input layer names
         payload = {
             "instances": [{
-                "input_layer": image_data.tolist(),    # Changed to match training model
-                "input_layer_2": padded_text[0].tolist()  # Changed to match training model
+                "serving_default_input_layer": image_data.tolist(),
+                "serving_default_input_layer_2": padded_text[0].tolist()
             }]
         }
         
-        # Add debug logging for the payload
-        logger.info(f"Sending payload: {json.dumps(payload, indent=2)}")
+        logger.info(f"Payload structure: {list(payload['instances'][0].keys())}")
         
         response = runtime.invoke_endpoint(
             EndpointName=endpoint_name,
@@ -50,9 +45,8 @@ def predict_with_endpoint(endpoint_name, image_data, text_content):
         return prediction
     except Exception as e:
         logger.error(f"Full error response: {str(e)}")
-        # If it's a boto3 error, it might have a response field
-        if hasattr(e, 'response'):
-            logger.error(f"Error response body: {e.response.get('Body', '').read()}")
+        if hasattr(e, 'response') and hasattr(e.response.get('Body', ''), 'read'):
+            logger.error(f"Error response body: {e.response['Body'].read()}")
         raise
 
 def preprocess_input(image_url):
