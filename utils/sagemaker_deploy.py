@@ -5,6 +5,7 @@ import tensorflow as tf
 import os
 import tarfile
 import boto3
+import datetime
 
 def convert_h5_to_saved_model(h5_path, saved_model_dir, preprocessing_info_path):
     # Use absolute paths
@@ -49,17 +50,31 @@ def convert_h5_to_saved_model(h5_path, saved_model_dir, preprocessing_info_path)
     
     new_model = tf.keras.Model(inputs=[image_input, text_input], outputs=outputs)
     
-    # Force initialization
+    # Create concrete function
+    print("\nCreating concrete function...")
+    @tf.function(input_signature=[
+        tf.TensorSpec(shape=(None, 224, 224, 3), dtype=tf.float32, name='image_input'),
+        tf.TensorSpec(shape=(None, 50), dtype=tf.float32, name='text_input')
+    ])
+    def serving_fn(image, text):
+        # Explicitly name the call
+        return new_model([image, text], training=False)
+    
+    # Force initialization with real-shaped data
     print("\nForcing initialization...")
     dummy_image = tf.zeros((1, 224, 224, 3))
     dummy_text = tf.zeros((1, 50))
     _ = new_model([dummy_image, dummy_text], training=False)
+    concrete_func = serving_fn.get_concrete_function()
     
-    # Save with explicit variable tracking
+    # Save with explicit naming
     print("\nSaving model...")
     tf.saved_model.save(
-        new_model, 
-        saved_model_dir,
+        obj=new_model,
+        export_dir=saved_model_dir,
+        signatures={
+            tf.saved_model.DEFAULT_SERVING_SIGNATURE_DEF_KEY: concrete_func
+        },
         options=tf.saved_model.SaveOptions(
             experimental_custom_gradients=False,
             save_debug_info=True
@@ -84,6 +99,10 @@ def deploy_model_to_sagemaker():
     bucket = 'bm-v1-bucket'
     key = 'model.tar.gz'
     s3_client = boto3.client('s3')
+    
+    # Add timestamp to model key
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    key = f'model_{timestamp}.tar.gz'
     
     # Upload the new model to S3
     root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
