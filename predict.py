@@ -28,11 +28,11 @@ def predict_with_endpoint(endpoint_name, image_data, text_content):
     # Preprocess the text content
     padded_text = preprocess_texts([text_content], max_sequence_length)
     
-    # Rest of your prediction logic...
+    # Modified payload structure - using the exact input names expected by the model
     payload = {
         "instances": [{
-            "image_input": image_data.tolist(),
-            "text_input": padded_text[0].tolist()
+            "input_1": image_data.tolist(),  # Changed from "image_input"
+            "input_2": padded_text[0].tolist()  # Changed from "text_input"
         }]
     }
     
