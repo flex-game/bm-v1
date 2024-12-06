@@ -25,8 +25,8 @@ def predict_with_endpoint(endpoint_name, image_data, text_content):
     # Instead of getting from endpoint, get these values from config/env vars
     max_sequence_length = int(os.getenv('MAX_SEQUENCE_LENGTH', 512))  # example default
     
-    # Note: You'll need to handle tokenizer and action_mapping differently
-    # as they're more complex than simple values
+    # Preprocess the text content
+    padded_text = preprocess_texts([text_content], max_sequence_length)
     
     # Rest of your prediction logic...
     payload = {
