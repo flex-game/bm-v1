@@ -1,8 +1,10 @@
 import os
 import logging
 import boto3
-from gdrive_utils import authenticate_gdrive, list_jpg_files, download_file_content
-from io import BytesIO
+from googleapiclient.discovery import build
+from google.oauth2 import service_account
+from googleapiclient.http import MediaIoBaseDownload
+import io
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -11,6 +13,38 @@ load_dotenv()
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+def authenticate_gdrive():
+    """Authenticate with Google Drive API using service account credentials."""
+    credentials_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
+    if not credentials_path:
+        raise ValueError("GOOGLE_APPLICATION_CREDENTIALS not found in .env file")
+    
+    credentials = service_account.Credentials.from_service_account_file(
+        credentials_path,
+        scopes=['https://www.googleapis.com/auth/drive.readonly']
+    )
+    return build('drive', 'v3', credentials=credentials)
+
+def list_jpg_files(service, folder_id):
+    """List all JPG files in a Google Drive folder."""
+    query = f"'{folder_id}' in parents and mimeType='image/jpeg' and trashed=false"
+    results = service.files().list(
+        q=query,
+        spaces='drive',
+        fields='files(id, name)'
+    ).execute()
+    return results.get('files', [])
+
+def download_file_content(service, file_id):
+    """Download a file's content from Google Drive."""
+    request = service.files().get_media(fileId=file_id)
+    file_content = io.BytesIO()
+    downloader = MediaIoBaseDownload(file_content, request)
+    done = False
+    while done is False:
+        _, done = downloader.next_chunk()
+    return file_content.getvalue()
 
 def upload_to_s3(s3_client, bucket_name, file_name, file_content):
     """Upload a file to an S3 bucket."""
@@ -56,21 +90,12 @@ def main():
     # Authenticate with Google Drive
     drive_service = authenticate_gdrive()
 
-    # Authenticate with AWS S3
+    # Initialize AWS S3 client using default credentials
     s3_client = boto3.client('s3')
 
     # Define the root folder ID and S3 bucket name
-    root_folder_id = '1BdyuWOoHuoeirHS7GwuMe77V3Cd35i_m'  # Replace with your actual root folder ID
-    bucket_name = 'buddy_model_v1_dataset'
-
-    # Create the S3 bucket if it doesn't exist
-    try:
-        s3_client.create_bucket(Bucket=bucket_name)
-        logger.info(f"Created S3 bucket: {bucket_name}")
-    except s3_client.exceptions.BucketAlreadyExists:
-        logger.info(f"S3 bucket {bucket_name} already exists.")
-    except s3_client.exceptions.BucketAlreadyOwnedByYou:
-        logger.info(f"S3 bucket {bucket_name} already owned by you.")
+    root_folder_id = '1BdyuWOoHuoeirHS7GwuMe77V3Cd35i_m'
+    bucket_name = 'bm-v1-bucket'  # Using the same bucket name as in sagemaker_deploy.py
 
     # Process Google Drive folders and upload images to S3
     process_gdrive_to_s3(drive_service, s3_client, root_folder_id, bucket_name)
