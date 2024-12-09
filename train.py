@@ -21,6 +21,9 @@ import time
 import zipfile
 import pickle
 from utils.text_preprocessing import preprocess_texts
+import boto3
+from botocore.exceptions import ClientError
+from pathlib import Path
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
@@ -202,6 +205,109 @@ def zip_and_upload_preprocessed_images(service, folder_id):
     os.remove('preprocessed_images.zip')
     logger.info("Preprocessed images uploaded and local zip removed")
 
+def get_matching_files_from_s3(image_bucket, text_bucket, actions_bucket):
+    """Get lists of matching files from all three buckets"""
+    s3_client = boto3.client('s3')
+    
+    def list_bucket_objects(bucket):
+        objects = []
+        paginator = s3_client.get_paginator('list_objects_v2')
+        try:
+            for page in paginator.paginate(Bucket=bucket):
+                if 'Contents' in page:
+                    # Extract just the filenames without paths
+                    filenames = [Path(obj['Key']).stem for obj in page['Contents']]
+                    objects.extend(filenames)
+            return set(objects)
+        except ClientError as e:
+            logger.error(f"Error accessing bucket {bucket}: {str(e)}")
+            raise
+
+    # Get all filenames (without extensions) from each bucket
+    image_files = list_bucket_objects(image_bucket)
+    text_files = list_bucket_objects(text_bucket)
+    action_files = list_bucket_objects(actions_bucket)
+    
+    # Find common files across all buckets
+    common_files = sorted(list(image_files & text_files & action_files))
+    
+    if not common_files:
+        raise ValueError("No matching files found across all three buckets")
+    
+    logger.info(f"Found {len(common_files)} matching files across all buckets")
+    return common_files
+
+def load_and_preprocess_data_from_s3(image_bucket, text_bucket, actions_bucket, 
+                                    max_sequence_length=50, num_words=10000):
+    """Load and preprocess data from S3 buckets using matching filenames"""
+    logger.info("Starting data loading from S3 buckets...")
+    s3_client = boto3.client('s3')
+    
+    # Get list of matching files
+    common_files = get_matching_files_from_s3(image_bucket, text_bucket, actions_bucket)
+    
+    # Initialize lists for data
+    texts = []
+    images = []
+    actions = []
+    
+    # Load data for each matching set of files
+    for filename in common_files:
+        try:
+            # Load text
+            text_response = s3_client.get_object(
+                Bucket=text_bucket, 
+                Key=f"{filename}.txt"
+            )
+            text_content = text_response['Body'].read().decode('utf-8').strip()
+            texts.append(text_content)
+            
+            # Load image
+            img_response = s3_client.get_object(
+                Bucket=image_bucket, 
+                Key=f"{filename}.jpg"
+            )
+            img_data = img_response['Body'].read()
+            img = load_img(BytesIO(img_data), target_size=(224, 224))
+            img_array = img_to_array(img)
+            img_array = resnet_preprocess_input(img_array)
+            images.append(img_array)
+            
+            # Load action
+            action_response = s3_client.get_object(
+                Bucket=actions_bucket, 
+                Key=f"{filename}.txt"
+            )
+            action_data = action_response['Body'].read().decode('utf-8').strip()
+            action_values = [int(x) for x in action_data.split(',')]
+            actions.append(action_values)
+            
+        except ClientError as e:
+            logger.error(f"Error loading files for {filename}: {str(e)}")
+            continue
+        except Exception as e:
+            logger.error(f"Error processing files for {filename}: {str(e)}")
+            continue
+        
+        # Log progress periodically
+        if len(texts) % 100 == 0:
+            logger.info(f"Processed {len(texts)} files...")
+    
+    # Convert to numpy arrays
+    images = np.array(images)
+    actions = np.array(actions)
+    
+    # Preprocess texts
+    padded_sequences, tokenizer = preprocess_texts(texts, num_words, max_sequence_length)
+    
+    # Create action mapping (assuming actions are binary and consistent across files)
+    action_mapping = {i: f"action_{i}" for i in range(actions.shape[1])}
+    
+    logger.info(f"Successfully processed {len(texts)} files")
+    logger.info(f"Final shapes - Images: {images.shape}, Text: {padded_sequences.shape}, Actions: {actions.shape}")
+    
+    return images, padded_sequences, actions, tokenizer, action_mapping
+
 # Main function to load data, create model, and train
 def main():
     start_time = time.time()
@@ -214,25 +320,29 @@ def main():
     folder_id = "14rV_AfSINfFyUQgZN4wJEgGtJCyzlv0a"
     csv_path = download_from_drive(service, folder_id, 'dataset.csv')
     
+    # S3 bucket names
+    IMAGE_BUCKET = 'bm-v1-training-images'
+    TEXT_BUCKET = 'bm-v1-training-text'
+    ACTIONS_BUCKET = 'bm-v1-training-actions'
+    
     # First check if preprocessed images exist in Drive
     if check_preprocessed_images(service, folder_id):
         logger.info("Loading preprocessed images from local directory...")
-        # Use relative paths
         images = np.load('preprocessed_images/images.npy')
         text_sequences = np.load('preprocessed_images/text_sequences.npy')
         actions = np.load('preprocessed_images/actions.npy')
         
-        # Still need to process the CSV to get the tokenizer and action_mapping
-        df = pd.read_csv(csv_path)
-        tokenizer = Tokenizer(num_words=10000)
-        tokenizer.fit_on_texts(df['stats_shot'])
-        action_columns = df.drop(columns=['image_path', 'stats_shot']).columns
-        action_mapping = {i: action for i, action in enumerate(action_columns)}
+        # Load fresh data from S3 for tokenizer and action_mapping
+        _, _, _, tokenizer, action_mapping = load_and_preprocess_data_from_s3(
+            IMAGE_BUCKET, TEXT_BUCKET, ACTIONS_BUCKET
+        )
     else:
         logger.info("Processing images from scratch...")
-        images, text_sequences, actions, tokenizer, action_mapping = load_and_preprocess_data(csv_path)
-
-        # Save preprocessed images
+        images, text_sequences, actions, tokenizer, action_mapping = load_and_preprocess_data_from_s3(
+            IMAGE_BUCKET, TEXT_BUCKET, ACTIONS_BUCKET
+        )
+        
+        # Save preprocessed data
         if not os.path.exists('preprocessed_images'):
             os.makedirs('preprocessed_images')
         np.save('preprocessed_images/images.npy', images)
