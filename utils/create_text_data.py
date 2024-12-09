@@ -1,7 +1,8 @@
-from openai import OpenAI
 import os
-import io
-from googleapiclient.http import MediaIoBaseDownload
+from openai import OpenAI
+from dotenv import load_dotenv
+
+load_dotenv()  # Load environment variables from .env file
 
 def load_system_prompt(prompt_file_path):
     """Load the system prompt from a text file."""
@@ -40,27 +41,6 @@ def generate_frame_description(image_url, prompt_file_path):
         max_tokens=1000
     )
     return response.choices[0].message.content
-
-def get_text_content(service, folder_id, filename):
-    """Fetch text content from a file in Google Drive."""
-    # Find the file by name in the specified folder
-    query = f"name = '{filename}' and '{folder_id}' in parents"
-    results = service.files().list(q=query, spaces='drive').execute()
-    files = results.get('files', [])
-    
-    if not files:
-        raise FileNotFoundError(f"No file found with name {filename}")
-        
-    # Get the content
-    file_id = files[0]['id']
-    request = service.files().get_media(fileId=file_id)
-    fh = io.BytesIO()
-    downloader = MediaIoBaseDownload(fh, request)
-    done = False
-    while done is False:
-        status, done = downloader.next_chunk()
-    
-    return fh.getvalue().decode('utf-8')
 
 def generate_action_description(image_url1, image_url2, prompt_file_path):
     """Generate a description of the differences between two frames using OpenAI."""
