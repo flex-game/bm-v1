@@ -24,6 +24,11 @@ from utils.text_preprocessing import preprocess_texts
 import boto3
 from botocore.exceptions import ClientError
 from pathlib import Path
+import sagemaker
+from sagemaker.tensorflow import TensorFlow
+from sagemaker.processing import ProcessingInput, ProcessingOutput
+from sagemaker.processing import ScriptProcessor
+import json
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
@@ -308,6 +313,77 @@ def load_and_preprocess_data_from_s3(image_bucket, text_bucket, actions_bucket,
     
     return images, padded_sequences, actions, tokenizer, action_mapping
 
+def prepare_action_labels():
+    """Extract and prepare unique action labels from training files"""
+    s3_client = boto3.client('s3')
+    actions_bucket = 'bm-v1-training-actions'
+    unique_actions = set()
+    
+    # List all files in actions bucket
+    paginator = s3_client.get_paginator('list_objects_v2')
+    for page in paginator.paginate(Bucket=actions_bucket):
+        for obj in page['Contents']:
+            response = s3_client.get_object(Bucket=actions_bucket, Key=obj['Key'])
+            action_data = json.loads(response['Body'].read().decode('utf-8'))
+            
+            # Add each action to our set of unique actions
+            for action in action_data['actions_by_player']:
+                unique_actions.add(action)
+    
+    # Convert to sorted list for consistent ordering
+    action_list = sorted(list(unique_actions))
+    action_mapping = {action: idx for idx, action in enumerate(action_list)}
+    
+    # Save action mapping to S3
+    s3_client.put_object(
+        Bucket='bm-v1-model',
+        Key='action_mapping.json',
+        Body=json.dumps(action_mapping)
+    )
+    
+    return action_mapping, len(action_list)
+
+def setup_sagemaker_training():
+    """Configure and start SageMaker training job"""
+    sagemaker_session = sagemaker.Session()
+    role = sagemaker.get_execution_role()
+    
+    # Get number of output classes
+    _, num_actions = prepare_action_labels()
+    
+    # Define hyperparameters
+    hyperparameters = {
+        'epochs': 10,
+        'batch_size': 32,
+        'learning_rate': 0.001,
+        'num_actions': num_actions,
+        'embedding_dim': 50,
+        'max_sequence_length': 50,
+        'num_words': 10000
+    }
+    
+    # Configure estimator
+    estimator = TensorFlow(
+        entry_point='model_train.py',  # Your training script
+        role=role,
+        instance_count=1,
+        instance_type='ml.p3.2xlarge',  # GPU instance
+        framework_version='2.11',
+        py_version='py39',
+        hyperparameters=hyperparameters,
+        output_path='s3://bm-v1-model/trained_models'
+    )
+    
+    # Define data channels
+    data_channels = {
+        'training': f's3://bm-v1-training-images',
+        'text': f's3://bm-v1-training-text',
+        'actions': f's3://bm-v1-training-actions'
+    }
+    
+    # Start training
+    estimator.fit(data_channels)
+
 # Main function to load data, create model, and train
 def main():
     start_time = time.time()
@@ -402,4 +478,4 @@ def main():
     logger.info(f"Total execution time: {elapsed_time/60:.2f} minutes")
 
 if __name__ == "__main__":
-    main() 
+    setup_sagemaker_training() 
