@@ -8,41 +8,11 @@ from tensorflow.keras.preprocessing.image import load_img, img_to_array
 from tensorflow.keras.applications.resnet50 import preprocess_input as resnet_preprocess_input
 from utils.text_preprocessing import preprocess_texts
 from utils.s3_utils import s3_list_bucket_objects, s3_get_matching_files, s3_verify_bucket_access
+from utils.actions import prepare_action_labels
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 logger = logging.getLogger(__name__)
-
-def prepare_action_labels():
-    # Extract and prepare unique action labels from training files
-
-    s3_client = boto3.client('s3')
-    actions_bucket = 'bm-v1-training-actions'
-    unique_actions = set()
-    
-    # List all files in actions bucket
-    paginator = s3_client.get_paginator('list_objects_v2')
-    for page in paginator.paginate(Bucket=actions_bucket):
-        for obj in page['Contents']:
-            response = s3_client.get_object(Bucket=actions_bucket, Key=obj['Key'])
-            action_data = json.loads(response['Body'].read().decode('utf-8'))
-            
-            # Add each action to our set of unique actions
-            for action in action_data['actions_by_player']:
-                unique_actions.add(action)
-    
-    # Convert to sorted list for consistent ordering
-    action_list = sorted(list(unique_actions))
-    action_mapping = {action: idx for idx, action in enumerate(action_list)}
-    
-    # Save action mapping to S3
-    s3_client.put_object(
-        Bucket='bm-v1-model',
-        Key='action_mapping.json',
-        Body=json.dumps(action_mapping)
-    )
-    
-    return action_mapping, len(action_list)
 
 if __name__ == "__main__":
     s3_verify_bucket_access()
