@@ -36,7 +36,7 @@ def main():
 
     # Hyperparameters
     max_sequence_length = 50
-    num_words = 10000
+    num_words = 2500  # Reduced by 3/4 from the original 10,000
     embedding_dim = 50
     learning_rate = 0.001
 
