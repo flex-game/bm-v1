@@ -24,6 +24,10 @@ def prepare_action_labels():
             
             action_data = json.loads(content)
             
+            # Handle case where action_data might be None
+            if action_data is None:
+                continue
+                
             # Handle case where actions_by_player might be None
             actions = action_data.get('actions_by_player', [])
             for action in actions:
