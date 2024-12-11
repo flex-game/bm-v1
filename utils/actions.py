@@ -6,9 +6,28 @@ import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-def prepare_action_labels():
-    """Extract and prepare unique action labels from training files."""
+def prepare_action_labels(force_refresh=False):
+    """Extract and prepare unique action labels from training files.
+    
+    Args:
+        force_refresh (bool): If True, regenerate mapping even if it exists. Defaults to False.
+    
+    Returns:
+        tuple: (action_mapping dict, number of unique actions)
+    """
     s3_client = boto3.client('s3')
+    model_bucket = 'bm-v1-model'
+    
+    # Check for existing mapping unless force refresh
+    if not force_refresh:
+        try:
+            response = s3_client.get_object(Bucket=model_bucket, Key='action_mapping.json')
+            action_mapping = json.loads(response['Body'].read().decode('utf-8'))
+            logger.info("Using existing action mapping")
+            return action_mapping, len(action_mapping)
+        except s3_client.exceptions.NoSuchKey:
+            logger.info("No existing action mapping found, generating new one")
+    
     actions_bucket = 'bm-v1-training-actions'
     unique_actions = set()
     
