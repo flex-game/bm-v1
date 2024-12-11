@@ -2,6 +2,7 @@ import boto3
 import logging
 from botocore.exceptions import ClientError
 from pathlib import Path
+import json
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
@@ -25,12 +26,10 @@ def s3_list_bucket_objects(bucket):
 
 def s3_get_matching_files(image_bucket, text_bucket, actions_bucket):
     """Get lists of matching files from all three buckets."""
-    # Get all filenames (without extensions) from each bucket
     image_files = s3_list_bucket_objects(image_bucket)
     text_files = s3_list_bucket_objects(text_bucket)
     action_files = s3_list_bucket_objects(actions_bucket)
     
-    # Find common files across all buckets
     common_files = sorted(list(image_files & text_files & action_files))
     
     if not common_files:
@@ -50,7 +49,6 @@ def s3_verify_bucket_access():
     for bucket in buckets_to_check['read']:
         try:
             s3_client.head_bucket(Bucket=bucket)
-            # Test list operation
             s3_client.list_objects_v2(Bucket=bucket, MaxKeys=1)
             logger.info(f"Successfully verified read access to {bucket}")
         except Exception as e:
@@ -59,7 +57,6 @@ def s3_verify_bucket_access():
     for bucket in buckets_to_check['write']:
         try:
             s3_client.head_bucket(Bucket=bucket)
-            # Test write operation with a small test file
             s3_client.put_object(
                 Bucket=bucket,
                 Key='test_write_access.txt',
@@ -71,4 +68,29 @@ def s3_verify_bucket_access():
             )
             logger.info(f"Successfully verified write access to {bucket}")
         except Exception as e:
-            raise Exception(f"Failed to write to bucket {bucket}: {str(e)}") 
+            raise Exception(f"Failed to write to bucket {bucket}: {str(e)}")
+
+def s3_load_data(image_bucket, text_bucket, actions_bucket, common_files):
+    """Load images, texts, and labels from S3."""
+    s3_client = boto3.client('s3')
+    images = []
+    texts = []
+    labels = []
+
+    for file in common_files:
+        # Load image
+        image_obj = s3_client.get_object(Bucket=image_bucket, Key=f"{file}.jpg")
+        image_data = image_obj['Body'].read()
+        images.append(image_data)
+
+        # Load text
+        text_obj = s3_client.get_object(Bucket=text_bucket, Key=f"{file}.txt")
+        text_data = text_obj['Body'].read().decode('utf-8')
+        texts.append(text_data)
+
+        # Load actions
+        action_obj = s3_client.get_object(Bucket=actions_bucket, Key=f"{file}.json")
+        action_data = json.loads(action_obj['Body'].read().decode('utf-8'))
+        labels.append(action_data['actions_by_player'])
+
+    return images, texts, labels 

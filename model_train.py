@@ -5,7 +5,9 @@ from tensorflow.keras.applications import ResNet50
 from tensorflow.keras.preprocessing.text import Tokenizer
 from tensorflow.keras.optimizers import Adam
 import numpy as np
+from io import BytesIO
 from preprocessing import load_action_mapping, preprocess_image, preprocess_text
+from utils.s3_utils import s3_get_matching_files, s3_load_data
 
 # Define the model
 def create_model(num_actions, max_sequence_length, num_words, embedding_dim):
@@ -42,23 +44,31 @@ def main():
     model = create_model(num_actions, max_sequence_length, num_words, embedding_dim)
     model.compile(optimizer=Adam(learning_rate=learning_rate), loss='categorical_crossentropy', metrics=['accuracy'])
 
-    # Load and preprocess data (placeholder)
-    # You will need to implement data loading and preprocessing here
-    # images, texts, labels = load_data()
+    # Load common files
+    common_files = s3_get_matching_files('bm-v1-training-images', 'bm-v1-training-text', 'bm-v1-training-actions')
+
+    # Load data from S3
+    raw_images, texts, labels = s3_load_data('bm-v1-training-images', 'bm-v1-training-text', 'bm-v1-training-actions', common_files)
+
+    # Preprocess images
+    images = np.array([preprocess_image(BytesIO(img)) for img in raw_images])
 
     # Tokenizer for text data
     tokenizer = Tokenizer(num_words=num_words)
-    # tokenizer.fit_on_texts(texts)  # Fit tokenizer on your text data
+    tokenizer.fit_on_texts(texts)
 
-    # Preprocess images and texts
-    # preprocessed_images = np.array([preprocess_image(img) for img in images])
-    # preprocessed_texts = np.array([preprocess_text(txt, tokenizer, max_sequence_length) for txt in texts])
+    # Preprocess texts
+    preprocessed_texts = np.array([preprocess_text(txt, tokenizer, max_sequence_length) for txt in texts])
+
+    # Convert labels to categorical
+    label_indices = [[action_mapping[action] for action in label] for label in labels]
+    categorical_labels = tf.keras.utils.to_categorical(label_indices, num_classes=num_actions)
 
     # Train the model
-    # model.fit([preprocessed_images, preprocessed_texts], labels, epochs=10, batch_size=32)
+    model.fit([images, preprocessed_texts], categorical_labels, epochs=10, batch_size=32)
 
     # Save the model
     model.save('s3://bm-v1-model/trained_models/model.h5')
 
 if __name__ == "__main__":
-    main() 
+    main()
