@@ -6,6 +6,7 @@ import tensorflow as tf
 from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, ReduceLROnPlateau
 import sagemaker
 import os
+import argparse
 
 # Load environment variables
 load_dotenv()
@@ -13,6 +14,15 @@ load_dotenv()
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+# Add argument parsing
+parser = argparse.ArgumentParser(description='Train the model')
+parser.add_argument('--refresh-actions', action='store_true', 
+                   help='Force refresh of action mappings')
+args = parser.parse_args()
+
+# Check both CLI argument and environment variable
+force_refresh = args.refresh_actions or os.environ.get('REFRESH_ACTIONS', '').lower() == 'true'
 
 if __name__ == "__main__":
     s3_verify_bucket_access()
@@ -24,7 +34,7 @@ if __name__ == "__main__":
         raise ValueError("SAGEMAKER_ROLE_ARN not found in environment variables")
     
     # Get number of output classes
-    _, num_actions = prepare_action_labels()
+    _, num_actions = prepare_action_labels(force_refresh=force_refresh)
     
     # Define hyperparameters
     hyperparameters = {
