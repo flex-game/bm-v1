@@ -3,6 +3,7 @@ from utils.s3_utils import s3_verify_bucket_access
 from utils.actions import prepare_action_labels
 import tensorflow as tf
 from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, ReduceLROnPlateau
+import sagemaker
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
