@@ -1,9 +1,14 @@
 import logging
+from dotenv import load_dotenv
 from utils.s3_utils import s3_verify_bucket_access
 from utils.actions import prepare_action_labels
 import tensorflow as tf
 from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, ReduceLROnPlateau
 import sagemaker
+import os
+
+# Load environment variables
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
@@ -14,7 +19,9 @@ if __name__ == "__main__":
     # Configure and start SageMaker training job
 
     sagemaker_session = sagemaker.Session()
-    role = sagemaker.get_execution_role()
+    role = os.getenv('SAGEMAKER_ROLE_ARN')
+    if not role:
+        raise ValueError("SAGEMAKER_ROLE_ARN not found in environment variables")
     
     # Get number of output classes
     _, num_actions = prepare_action_labels()
