@@ -10,7 +10,7 @@ from io import BytesIO
 import json
 import boto3
 from utils.create_text_data import generate_frame_description
-from utils.text_preprocessing import preprocess_texts
+from utils.text import preprocess_texts
 from dotenv import load_dotenv
 
 load_dotenv()  # Load environment variables from .env file

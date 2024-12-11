@@ -6,7 +6,7 @@ import numpy as np
 from io import BytesIO
 from tensorflow.keras.preprocessing.image import load_img, img_to_array
 from tensorflow.keras.applications.resnet50 import preprocess_input as resnet_preprocess_input
-from utils.text_preprocessing import preprocess_texts
+from utils.text import preprocess_texts
 from utils.s3_utils import s3_list_bucket_objects, s3_get_matching_files, s3_verify_bucket_access
 from utils.actions import prepare_action_labels
 

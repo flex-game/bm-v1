@@ -8,7 +8,7 @@ from tensorflow.keras.optimizers import Adam
 import numpy as np
 import json
 import boto3
-from utils.text_preprocessing import preprocess_texts
+from utils.text import preprocess_texts
 
 # Load action mapping from S3
 def load_action_mapping():
