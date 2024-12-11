@@ -1,4 +1,4 @@
-import tensorflow as tf
+import logging
 from tensorflow.keras.layers import Input, Dense, Concatenate, Embedding, LSTM, GlobalAveragePooling2D
 from tensorflow.keras.models import Model
 from tensorflow.keras.applications import ResNet50
@@ -8,6 +8,14 @@ import numpy as np
 from io import BytesIO
 from preprocessing import load_action_mapping, preprocess_image, preprocess_text
 from utils.s3_utils import s3_get_matching_files, s3_load_data
+
+def setup_logging():
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    return logging.getLogger(__name__)
 
 # Define the model
 def create_model(num_actions, max_sequence_length, num_words, embedding_dim):
@@ -30,45 +38,96 @@ def create_model(num_actions, max_sequence_length, num_words, embedding_dim):
     return model
 
 def main():
-    # Load action mapping
-    action_mapping = load_action_mapping()
-    num_actions = len(action_mapping)
+    logger = setup_logging()
+    logger.info("=== Starting Model Training Process ===")
+    
+    try:
+        # Load action mapping
+        logger.info("Loading action mapping...")
+        action_mapping = load_action_mapping()
+        num_actions = len(action_mapping)
+        logger.info("Found %d unique actions", num_actions)
 
-    # Hyperparameters
-    max_sequence_length = 50
-    num_words = 2500  # Reduced by 3/4 from the original 10,000
-    embedding_dim = 50
-    learning_rate = 0.001
+        # Hyperparameters
+        max_sequence_length = 50
+        num_words = 2500
+        embedding_dim = 50
+        learning_rate = 0.001
+        logger.info("Hyperparameters: max_seq_len=%d, vocab_size=%d, embed_dim=%d, lr=%.4f", 
+                    max_sequence_length, num_words, embedding_dim, learning_rate)
 
-    # Create model
-    model = create_model(num_actions, max_sequence_length, num_words, embedding_dim)
-    model.compile(optimizer=Adam(learning_rate=learning_rate), loss='categorical_crossentropy', metrics=['accuracy'])
+        # Create model
+        logger.info("Creating and compiling model...")
+        model = create_model(num_actions, max_sequence_length, num_words, embedding_dim)
+        model.compile(optimizer=Adam(learning_rate=learning_rate), 
+                     loss='categorical_crossentropy', 
+                     metrics=['accuracy'])
+        
+        # Load common files
+        logger.info("Finding common files in S3...")
+        common_files = s3_get_matching_files('bm-v1-training-images', 
+                                           'bm-v1-training-text', 
+                                           'bm-v1-training-actions')
+        logger.info("Found %d matching files", len(common_files))
 
-    # Load common files
-    common_files = s3_get_matching_files('bm-v1-training-images', 'bm-v1-training-text', 'bm-v1-training-actions')
+        # Load data from S3
+        logger.info("Loading data from S3...")
+        raw_images, texts, labels = s3_load_data('bm-v1-training-images', 
+                                                'bm-v1-training-text', 
+                                                'bm-v1-training-actions', 
+                                                common_files)
+        logger.info("Loaded %d images, %d texts, and %d labels", 
+                   len(raw_images), len(texts), len(labels))
 
-    # Load data from S3
-    raw_images, texts, labels = s3_load_data('bm-v1-training-images', 'bm-v1-training-text', 'bm-v1-training-actions', common_files)
+        # Preprocess images
+        logger.info("Preprocessing images...")
+        images = np.array([preprocess_image(BytesIO(img)) for img in raw_images])
+        logger.info("Image array shape: %s", images.shape)
 
-    # Preprocess images
-    images = np.array([preprocess_image(BytesIO(img)) for img in raw_images])
+        # Tokenizer for text data
+        logger.info("Tokenizing text data...")
+        tokenizer = Tokenizer(num_words=num_words)
+        tokenizer.fit_on_texts(texts)
+        logger.info("Vocabulary size: %d", len(tokenizer.word_index))
 
-    # Tokenizer for text data
-    tokenizer = Tokenizer(num_words=num_words)
-    tokenizer.fit_on_texts(texts)
+        # Preprocess texts
+        logger.info("Converting texts to sequences...")
+        preprocessed_texts = np.array([preprocess_text(txt, tokenizer, max_sequence_length) 
+                                     for txt in texts])
+        logger.info("Text array shape: %s", preprocessed_texts.shape)
 
-    # Preprocess texts
-    preprocessed_texts = np.array([preprocess_text(txt, tokenizer, max_sequence_length) for txt in texts])
+        # Convert labels to categorical
+        logger.info("Processing labels...")
+        label_indices = [[action_mapping[action] for action in label] for label in labels]
+        categorical_labels = tf.keras.utils.to_categorical(label_indices, num_classes=num_actions)
+        logger.info("Label array shape: %s", categorical_labels.shape)
 
-    # Convert labels to categorical
-    label_indices = [[action_mapping[action] for action in label] for label in labels]
-    categorical_labels = tf.keras.utils.to_categorical(label_indices, num_classes=num_actions)
+        # Train the model
+        logger.info("=== Starting Training ===")
+        history = model.fit(
+            [images, preprocessed_texts],
+            categorical_labels,
+            epochs=10,
+            batch_size=32,
+            validation_split=0.2,
+            verbose=1
+        )
 
-    # Train the model
-    model.fit([images, preprocessed_texts], categorical_labels, epochs=10, batch_size=32)
+        # Log final metrics
+        logger.info("=== Training Complete ===")
+        logger.info("Final training accuracy: %.4f", history.history['accuracy'][-1])
+        logger.info("Final validation accuracy: %.4f", history.history['val_accuracy'][-1])
 
-    # Save the model
-    model.save('s3://bm-v1-model/trained_models/model.h5')
+        # Save the model
+        logger.info("Saving model to S3...")
+        model.save('s3://bm-v1-model/trained_models/model.h5')
+        logger.info("Model saved successfully")
+
+        logger.info("=== Training Process Complete ===")
+
+    except Exception as e:
+        logger.error("Training failed: %s", str(e), exc_info=True)
+        raise
 
 if __name__ == "__main__":
     main()

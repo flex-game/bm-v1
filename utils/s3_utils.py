@@ -88,8 +88,8 @@ def s3_load_data(image_bucket, text_bucket, actions_bucket, common_files):
         text_data = text_obj['Body'].read().decode('utf-8')
         texts.append(text_data)
 
-        # Load actions
-        action_obj = s3_client.get_object(Bucket=actions_bucket, Key=f"{file}.json")
+        # Load actions (now using .txt extension)
+        action_obj = s3_client.get_object(Bucket=actions_bucket, Key=f"{file}.txt")
         action_data = json.loads(action_obj['Body'].read().decode('utf-8'))
         labels.append(action_data['actions_by_player'])
 
