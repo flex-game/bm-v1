@@ -17,10 +17,16 @@ def prepare_action_labels():
     for page in paginator.paginate(Bucket=actions_bucket):
         for obj in page['Contents']:
             response = s3_client.get_object(Bucket=actions_bucket, Key=obj['Key'])
-            action_data = json.loads(response['Body'].read().decode('utf-8'))
+            content = response['Body'].read().decode('utf-8')
             
-            # Add each action to our set of unique actions
-            for action in action_data['actions_by_player']:
+            # Remove markdown code block formatting
+            content = content.replace('```json', '').replace('```', '').strip()
+            
+            action_data = json.loads(content)
+            
+            # Handle case where actions_by_player might be None
+            actions = action_data.get('actions_by_player', [])
+            for action in actions:
                 unique_actions.add(action)
     
     # Convert to sorted list for consistent ordering
