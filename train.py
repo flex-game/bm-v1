@@ -1,6 +1,8 @@
 import logging
 from utils.s3_utils import s3_verify_bucket_access
 from utils.actions import prepare_action_labels
+import tensorflow as tf
+from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, ReduceLROnPlateau
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
@@ -24,7 +26,7 @@ if __name__ == "__main__":
         'num_actions': num_actions,
         'embedding_dim': 50,
         'max_sequence_length': 50,
-        'num_words': 10000
+        'num_words': 2500
     }
     
     # Configure estimator

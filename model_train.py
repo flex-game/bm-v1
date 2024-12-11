@@ -8,6 +8,8 @@ import numpy as np
 from io import BytesIO
 from preprocessing import load_action_mapping, preprocess_image, preprocess_text
 from utils.s3_utils import s3_get_matching_files, s3_load_data
+import tensorflow as tf
+from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, ReduceLROnPlateau
 
 def setup_logging():
     logging.basicConfig(
@@ -102,6 +104,26 @@ def main():
         categorical_labels = tf.keras.utils.to_categorical(label_indices, num_classes=num_actions)
         logger.info("Label array shape: %s", categorical_labels.shape)
 
+        # Add callbacks for better training
+        callbacks = [
+            EarlyStopping(
+                monitor='val_loss',
+                patience=3,
+                restore_best_weights=True
+            ),
+            ModelCheckpoint(
+                'checkpoints/model_{epoch:02d}.h5',
+                save_best_only=True,
+                monitor='val_loss'
+            ),
+            ReduceLROnPlateau(
+                monitor='val_loss',
+                factor=0.5,
+                patience=2,
+                min_lr=0.00001
+            )
+        ]
+
         # Train the model
         logger.info("=== Starting Training ===")
         history = model.fit(
@@ -110,6 +132,7 @@ def main():
             epochs=10,
             batch_size=32,
             validation_split=0.2,
+            callbacks=callbacks,
             verbose=1
         )
 
