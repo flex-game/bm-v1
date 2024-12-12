@@ -99,7 +99,7 @@ if __name__ == "__main__":
         source_dir='.',
         role=role,
         instance_count=1,
-        instance_type='ml.m5.xlarge',
+        instance_type='ml.m5.large',
         framework_version='2.14',
         py_version='py310',
         image_uri=image_uri,

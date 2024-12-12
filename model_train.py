@@ -11,6 +11,8 @@ from utils.s3_utils import s3_get_matching_files, s3_load_data
 import tensorflow as tf
 from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, ReduceLROnPlateau
 from tensorflow.keras.preprocessing.sequence import pad_sequences
+import os
+import boto3
 
 def setup_logging():
     logging.basicConfig(
@@ -142,10 +144,23 @@ def main():
         logger.info("Final training accuracy: %.4f", history.history['accuracy'][-1])
         logger.info("Final validation accuracy: %.4f", history.history['val_accuracy'][-1])
 
-        # Save the model
-        logger.info("Saving model to S3...")
-        model.save('s3://bm-v1-model/trained_models/model.h5')
-        logger.info("Model saved successfully")
+        # Save the model locally using the newer format
+        local_model_path = '/opt/ml/model/model.keras'
+        logger.info("Saving model locally...")
+        tf.keras.models.save_model(
+            model,
+            local_model_path,
+            overwrite=True,
+            save_format='keras'  # Using the newer format
+        )
+
+        # Upload the model to S3
+        s3 = boto3.client('s3')
+        bucket_name = 'bm-v1-model'
+        s3_model_path = 'trained_models/model.keras'
+        logger.info("Uploading model to S3...")
+        s3.upload_file(local_model_path, bucket_name, s3_model_path)
+        logger.info("Model uploaded successfully to s3://%s/%s", bucket_name, s3_model_path)
 
         logger.info("=== Training Process Complete ===")
 
