@@ -10,9 +10,9 @@ aws ecr create-repository --repository-name bm-v1-training || true
 # Login to ECR
 aws ecr get-login-password --region $region | docker login --username AWS --password-stdin $aws_account_id.dkr.ecr.$region.amazonaws.com
 
-# Build image
+# Build image with platform specification
 echo "Building Docker image..."
-docker build -t bm-v1-training . || { echo "Docker build failed"; exit 1; }
+docker build --platform linux/amd64 -t bm-v1-training . || { echo "Docker build failed"; exit 1; }
 
 # Tag image
 echo "Tagging image..."
