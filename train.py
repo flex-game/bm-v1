@@ -50,12 +50,13 @@ if __name__ == "__main__":
     
     # Configure estimator
     estimator = TensorFlow(
-        entry_point='model_train.py',  # Your training script
+        entry_point='model_train.py',
+        source_dir='.',
         role=role,
         instance_count=1,
         instance_type='ml.c4.xlarge',
-        framework_version='2.11',
-        py_version='py39',
+        framework_version='2.14',
+        py_version='py310',
         hyperparameters=hyperparameters,
         output_path='s3://bm-v1-model/trained_models'
     )
