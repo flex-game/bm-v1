@@ -98,9 +98,9 @@ def main():
                                      for txt in texts])
         logger.info("Text array shape: %s", preprocessed_texts.shape)
 
-        # Convert labels to categorical
+        # Convert labels to categorical (taking only first action)
         logger.info("Processing labels...")
-        label_indices = [[action_mapping[action] for action in label] for label in labels]
+        label_indices = [action_mapping[label[0]] if label else 0 for label in labels]  # Take first action or default to 0
         categorical_labels = tf.keras.utils.to_categorical(label_indices, num_classes=num_actions)
         logger.info("Label array shape: %s", categorical_labels.shape)
 
