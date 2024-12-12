@@ -21,4 +21,4 @@ def preprocess_image(image_path):
 def preprocess_text(text, tokenizer, max_sequence_length):
     sequences = tokenizer.texts_to_sequences([text])
     padded_sequences = pad_sequences(sequences, maxlen=max_sequence_length)
-    return padded_sequences
+    return padded_sequences[0]

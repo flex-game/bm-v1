@@ -3,7 +3,6 @@ from dotenv import load_dotenv
 from utils.s3_utils import s3_verify_bucket_access
 from utils.actions import prepare_action_labels
 import tensorflow as tf
-from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, ReduceLROnPlateau
 import sagemaker
 import os
 import argparse
@@ -20,15 +19,17 @@ logger = logging.getLogger(__name__)
 parser = argparse.ArgumentParser(description='Train the model')
 parser.add_argument('--refresh-actions', action='store_true', 
                    help='Force refresh of action mappings')
+parser.add_argument('--refresh-image', action='store_true',
+                   help='Force refresh of Docker image')
 args = parser.parse_args()
 
-# Check both CLI argument and environment variable
+# Check both CLI argument and environment variables
 force_refresh = args.refresh_actions or os.environ.get('REFRESH_ACTIONS', '').lower() == 'true'
+force_image_refresh = args.refresh_image or os.environ.get('REFRESH_IMAGE', '').lower() == 'true'
 
 if __name__ == "__main__":
     s3_verify_bucket_access()
-    # Configure and start SageMaker training job
-
+    
     sagemaker_session = sagemaker.Session()
     role = os.getenv('SAGEMAKER_ROLE_ARN')
     if not role:
@@ -48,6 +49,19 @@ if __name__ == "__main__":
         'num_words': 2500
     }
     
+    # Use cached image unless force refresh is requested
+    image_uri = None
+    if not force_image_refresh:
+        try:
+            image_uri = os.getenv('SAGEMAKER_IMAGE_URI')
+            if image_uri:
+                logger.info(f"Using cached Docker image: {image_uri}")
+            else:
+                logger.warning("SAGEMAKER_IMAGE_URI not found in environment variables")
+        except Exception as e:
+            logger.warning(f"Failed to use cached image: {e}")
+            image_uri = None
+    
     # Configure estimator
     estimator = TensorFlow(
         entry_point='model_train.py',
@@ -57,6 +71,7 @@ if __name__ == "__main__":
         instance_type='ml.c4.xlarge',
         framework_version='2.14',
         py_version='py310',
+        image_uri=image_uri,
         hyperparameters=hyperparameters,
         output_path='s3://bm-v1-model/trained_models'
     )
