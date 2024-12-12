@@ -10,7 +10,7 @@
 
 1. **Create a Virtual Environment**:
    ```bash
-   python3 -m venv myenv
+   python3 -m venv venv
    ```
 
 2. **Activate the Virtual Environment**:
