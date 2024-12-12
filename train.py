@@ -7,6 +7,9 @@ import sagemaker
 import os
 import argparse
 from sagemaker.tensorflow import TensorFlow
+import psutil
+import time
+from datetime import datetime
 
 # Load environment variables
 load_dotenv()
@@ -27,7 +30,35 @@ args = parser.parse_args()
 force_refresh = args.refresh_actions or os.environ.get('REFRESH_ACTIONS', '').lower() == 'true'
 force_image_refresh = args.refresh_image or os.environ.get('REFRESH_IMAGE', '').lower() == 'true'
 
+def monitor_resources(start_time=None):
+    memory = psutil.virtual_memory()
+    cpu_percent = psutil.cpu_percent(interval=1)
+    
+    if start_time:
+        elapsed = time.time() - start_time
+        elapsed_str = f"Elapsed: {elapsed:.1f}s"
+    else:
+        elapsed_str = "Initial check"
+
+    logging.info(f"""
+    Resource Usage ({elapsed_str}):
+    Memory:
+    - Total: {memory.total / (1024**3):.2f} GB
+    - Available: {memory.available / (1024**3):.2f} GB
+    - Used: {memory.used / (1024**3):.2f} GB
+    - Percentage: {memory.percent}%
+    CPU Usage: {cpu_percent}%
+    """)
+    return memory.used / (1024**3)  # Return GB used for tracking peak
+
 if __name__ == "__main__":
+    start_time = time.time()
+    peak_memory = 0
+    
+    # Initial resource check
+    initial_memory = monitor_resources()
+    peak_memory = max(peak_memory, initial_memory)
+    
     s3_verify_bucket_access()
     
     sagemaker_session = sagemaker.Session()
@@ -68,7 +99,7 @@ if __name__ == "__main__":
         source_dir='.',
         role=role,
         instance_count=1,
-        instance_type='ml.c4.xlarge',
+        instance_type='ml.m5.xlarge',
         framework_version='2.14',
         py_version='py310',
         image_uri=image_uri,
