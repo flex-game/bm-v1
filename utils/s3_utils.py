@@ -3,6 +3,7 @@ import logging
 from botocore.exceptions import ClientError
 from pathlib import Path
 import json
+from utils.actions import parse_action_file
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
@@ -88,9 +89,10 @@ def s3_load_data(image_bucket, text_bucket, actions_bucket, common_files):
         text_data = text_obj['Body'].read().decode('utf-8')
         texts.append(text_data)
 
-        # Load actions (now using .txt extension)
+        # Load actions using existing parser
         action_obj = s3_client.get_object(Bucket=actions_bucket, Key=f"{file}.txt")
-        action_data = json.loads(action_obj['Body'].read().decode('utf-8'))
-        labels.append(action_data['actions_by_player'])
+        action_content = action_obj['Body'].read().decode('utf-8')
+        actions = parse_action_file(action_content)
+        labels.append(actions)
 
     return images, texts, labels 

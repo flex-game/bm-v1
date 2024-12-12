@@ -48,16 +48,7 @@ if __name__ == "__main__":
         'num_words': 2500
     }
     
-    # Get the image URI
-    image_uri = sagemaker.image_uris.retrieve(
-        framework='tensorflow',
-        region=sagemaker_session.boto_session.region_name,
-        version='2.14',
-        py_version='py310',
-        instance_type='ml.c4.xlarge'
-    )
-    
-    # Configure estimator with explicit image_uri
+    # Configure estimator
     estimator = TensorFlow(
         entry_point='model_train.py',
         source_dir='.',
@@ -66,7 +57,6 @@ if __name__ == "__main__":
         instance_type='ml.c4.xlarge',
         framework_version='2.14',
         py_version='py310',
-        image_uri=image_uri,
         hyperparameters=hyperparameters,
         output_path='s3://bm-v1-model/trained_models'
     )
@@ -78,9 +68,5 @@ if __name__ == "__main__":
         'actions': f's3://bm-v1-training-actions'
     }
     
-    # Add before estimator.fit()
-    logger.info(f"Using image URI: {image_uri}")
-    logger.info("Starting training job...")
-    
-    # Start training with debug mode
-    estimator.fit(data_channels, wait=True, logs="All")
+    # Start training
+    estimator.fit(data_channels)
