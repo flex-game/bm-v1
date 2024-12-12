@@ -53,7 +53,7 @@ if __name__ == "__main__":
         entry_point='model_train.py',  # Your training script
         role=role,
         instance_count=1,
-        instance_type='ml.t3.medium',  # GPU instance
+        instance_type='ml.c4.xlarge',
         framework_version='2.11',
         py_version='py39',
         hyperparameters=hyperparameters,
