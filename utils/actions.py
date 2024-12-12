@@ -6,11 +6,41 @@ import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+def parse_action_file(content):
+    """Parse a single action file's content.
+    
+    Args:
+        content (str): Raw content of action file
+    
+    Returns:
+        list: List of actions from the file
+    """
+    try:
+        # Remove markdown code block formatting
+        content = content.replace('```json', '').replace('```', '').strip()
+        
+        # Handle empty files
+        if not content:
+            return []
+            
+        action_data = json.loads(content)
+        
+        # Handle case where action_data might be None
+        if action_data is None:
+            return []
+            
+        # Handle case where actions_by_player might be None
+        return action_data.get('actions_by_player', [])
+        
+    except Exception as e:
+        logger.warning(f"Error parsing action file: {str(e)}")
+        return []
+
 def prepare_action_labels(force_refresh=False):
     """Extract and prepare unique action labels from training files.
     
     Args:
-        force_refresh (bool): If True, regenerate mapping even if it exists. Defaults to False.
+        force_refresh (bool): If True, regenerate mapping even if it exists.
     
     Returns:
         tuple: (action_mapping dict, number of unique actions)
@@ -38,17 +68,8 @@ def prepare_action_labels(force_refresh=False):
             response = s3_client.get_object(Bucket=actions_bucket, Key=obj['Key'])
             content = response['Body'].read().decode('utf-8')
             
-            # Remove markdown code block formatting
-            content = content.replace('```json', '').replace('```', '').strip()
-            
-            action_data = json.loads(content)
-            
-            # Handle case where action_data might be None
-            if action_data is None:
-                continue
-                
-            # Handle case where actions_by_player might be None
-            actions = action_data.get('actions_by_player', [])
+            # Use the separated parsing function
+            actions = parse_action_file(content)
             for action in actions:
                 unique_actions.add(action)
     
