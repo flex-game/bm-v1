@@ -2,6 +2,7 @@ import boto3
 import json
 import tensorflow as tf
 from tensorflow.keras.preprocessing.sequence import pad_sequences
+from io import BytesIO
 
 # Load action mapping from S3
 def load_action_mapping():
@@ -11,8 +12,15 @@ def load_action_mapping():
     return action_mapping
 
 # Preprocess image
-def preprocess_image(image_path):
-    image = tf.keras.preprocessing.image.load_img(image_path, target_size=(224, 224))
+def preprocess_image(image_data):
+    """
+    Args:
+        image_data: Either a file path or BytesIO object
+    """
+    if isinstance(image_data, BytesIO):
+        image = tf.keras.preprocessing.image.load_img(image_data, target_size=(224, 224))
+    else:
+        image = tf.keras.preprocessing.image.load_img(image_data, target_size=(224, 224))
     image = tf.keras.preprocessing.image.img_to_array(image)
     image = tf.keras.applications.resnet50.preprocess_input(image)
     return image

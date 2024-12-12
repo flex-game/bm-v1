@@ -1,15 +1,32 @@
-FROM python:3.10-slim
+FROM tensorflow/tensorflow:2.14.0
 
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    python3-pip \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python packages
+RUN pip3 install --no-cache-dir \
+    sagemaker-training \
+    boto3 \
+    numpy \
+    pandas \
+    pillow \
+    scikit-learn \
+    python-dotenv \
+    requests \
+    tensorflow-hub \
+    tensorflow-text
+
+# Set working directory
 WORKDIR /opt/ml/code
 
-# Install only what we need
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy training code
+COPY . .
 
-# Copy our code
-COPY model_train.py .
-COPY preprocessing.py .
-COPY utils/ ./utils/
+# Make train script executable
+RUN chmod +x train.py
 
-# Set up entrypoint
-ENTRYPOINT ["python", "model_train.py"] 
+# Set entrypoint
+ENTRYPOINT ["python3"] 
