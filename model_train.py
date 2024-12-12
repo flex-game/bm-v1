@@ -10,6 +10,7 @@ from preprocessing import load_action_mapping, preprocess_image, preprocess_text
 from utils.s3_utils import s3_get_matching_files, s3_load_data
 import tensorflow as tf
 from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, ReduceLROnPlateau
+from tensorflow.keras.preprocessing.sequence import pad_sequences
 
 def setup_logging():
     logging.basicConfig(
