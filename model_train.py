@@ -115,9 +115,10 @@ def main():
                 restore_best_weights=True
             ),
             ModelCheckpoint(
-                'checkpoints/model_{epoch:02d}.h5',
+                filepath='checkpoints/model_{epoch:02d}.keras',  # NEW - changed .h5 to .keras
                 save_best_only=True,
-                monitor='val_loss'
+                monitor='val_loss',
+                mode='min'
             ),
             ReduceLROnPlateau(
                 monitor='val_loss',

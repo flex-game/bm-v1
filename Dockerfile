@@ -22,13 +22,11 @@ RUN pip3 install --no-cache-dir \
 # Set working directory
 WORKDIR /opt/ml/code
 
-# Copy specific files needed for training
-COPY model_train.py preprocessing.py utils/ /opt/ml/code/
-
-# Make train script executable
+# Copy all necessary files
 COPY . .
-RUN chmod +x train.py
-RUN chmod +x model_train.py
 
-# Set entrypoint
-ENTRYPOINT ["python3"] 
+# Make scripts executable
+RUN chmod +x train.py model_train.py
+
+# Set entrypoint for SageMaker
+ENTRYPOINT ["python3", "model_train.py"] 
