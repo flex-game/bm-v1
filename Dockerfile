@@ -26,6 +26,8 @@ WORKDIR /opt/ml/code
 COPY model_train.py preprocessing.py utils/ /opt/ml/code/
 
 # Make train script executable
+COPY . .
+RUN chmod +x train.py
 RUN chmod +x model_train.py
 
 # Set entrypoint
