@@ -8,3 +8,4 @@ sagemaker==2.235.2
 tensorflow==2.14.0
 tensorflow-io-gcs-filesystem==0.37.1
 openai==1.50.0
+pillow==11.0.0
