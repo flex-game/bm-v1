@@ -151,8 +151,7 @@ def main():
         tf.keras.models.save_model(
             model,
             local_model_path,
-            overwrite=True,
-            save_format='keras'  # Using the newer format
+            overwrite=True
         )
 
         # Upload the model to S3

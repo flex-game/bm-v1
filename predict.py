@@ -12,6 +12,7 @@ import boto3
 from utils.create_text_data import generate_frame_description
 from utils.text import preprocess_texts
 from dotenv import load_dotenv
+from utils.actions import load_action_mapping
 
 load_dotenv()  # Load environment variables from .env file
 
@@ -69,6 +70,9 @@ def preprocess_input(image_url):
 
 def main():
     logger.info("Starting initialization...")
+    
+    # Add this line
+    action_mapping = load_action_mapping()
     
     # Get the endpoint name from environment variable
     endpoint_name = os.getenv('SAGEMAKER_ENDPOINT_NAME')
