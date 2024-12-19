@@ -3,6 +3,7 @@ import json
 import tensorflow as tf
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from io import BytesIO
+import pickle
 
 # Load action mapping from S3
 def load_action_mapping():
@@ -25,8 +26,29 @@ def preprocess_image(image_data):
     image = tf.keras.applications.resnet50.preprocess_input(image)
     return image
 
-# Preprocess text
-def preprocess_text(text, tokenizer, max_sequence_length):
+# Load the tokenizer from S3
+def load_tokenizer():
+    """Load the tokenizer from S3."""
+    s3_client = boto3.client('s3')
+    # Adjust the path to where your latest model's tokenizer is stored
+    response = s3_client.get_object(
+        Bucket='bm-v1-model', 
+        Key='trained_models/tokenizer.pkl'
+    )
+    return pickle.loads(response['Body'].read())
+
+# Update the preprocess_text function to optionally load the tokenizer
+def preprocess_text(text, tokenizer=None, max_sequence_length=50):
+    """
+    Preprocess text using saved tokenizer.
+    Args:
+        text: String to process
+        tokenizer: Optional tokenizer instance. If None, loads from S3.
+        max_sequence_length: Max length for padding
+    """
+    if tokenizer is None:
+        tokenizer = load_tokenizer()
+    
     sequences = tokenizer.texts_to_sequences([text])
     padded_sequences = pad_sequences(sequences, maxlen=max_sequence_length)
     return padded_sequences[0]

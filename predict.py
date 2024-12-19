@@ -13,6 +13,7 @@ from utils.create_text_data import generate_frame_description
 from utils.text import preprocess_texts
 from dotenv import load_dotenv
 from utils.actions import load_action_mapping
+from utils.preprocessing import preprocess_text
 
 load_dotenv()  # Load environment variables from .env file
 
@@ -28,12 +29,12 @@ def predict_with_endpoint(endpoint_name, image_data, text_content):
         runtime = boto3.client('sagemaker-runtime')
         
         max_sequence_length = int(os.getenv('MAX_SEQUENCE_LENGTH', 512))
-        padded_text = preprocess_texts([text_content], max_sequence_length)
+        padded_text = preprocess_text(text_content, max_sequence_length)
         
         payload = {
             "instances": [{
                 "inputs": image_data.tolist(),
-                "inputs_1": padded_text[0].tolist()
+                "inputs_1": padded_text.tolist()
             }]
         }
         
