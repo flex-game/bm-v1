@@ -85,7 +85,7 @@ def main():
     image_url = input("Please enter the image URL: ")
     
     # Generate text description using OpenAI
-    frame_prompt_path = 'utils/oai_system_prompts/frame_analysis_system_prompt.txt'
+    frame_prompt_path = os.path.join('utils', 'frame_analysis_system_prompt.txt')
     text_content = generate_frame_description(image_url, frame_prompt_path)
     
     # Preprocess both inputs
