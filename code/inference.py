@@ -2,6 +2,7 @@ import json
 import pickle
 import tensorflow as tf
 import numpy as np
+from utils.preprocessing import preprocess_image, preprocess_text
 
 def model_fn(model_dir):
     """Load the model and tokenizer from the model directory."""

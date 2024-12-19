@@ -6,7 +6,7 @@ from tensorflow.keras.preprocessing.text import Tokenizer
 from tensorflow.keras.optimizers import Adam
 import numpy as np
 from io import BytesIO
-from preprocessing import load_action_mapping, preprocess_image, preprocess_text
+from utils.preprocessing import load_action_mapping, preprocess_image, preprocess_text
 from utils.s3_utils import s3_get_matching_files, s3_load_data
 import tensorflow as tf
 from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, ReduceLROnPlateau
