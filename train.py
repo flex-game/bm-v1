@@ -96,8 +96,12 @@ if __name__ == "__main__":
         py_version='py310',
         image_uri=image_uri,
         hyperparameters=hyperparameters,
-        output_path='s3://bm-v1-model/trained_models'
+        output_path='s3://bm-v1-model/trained_models',
+        code_location='s3://bm-v1-model/code',
+        model_dir='s3://bm-v1-model/trained_models'
     )
+    
+    estimator.dependencies = ['code/']
     
     # Define data channels
     data_channels = {

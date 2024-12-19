@@ -13,6 +13,7 @@ from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, ReduceLRO
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 import os
 import boto3
+import pickle
 
 def setup_logging():
     logging.basicConfig(
@@ -145,22 +146,9 @@ def main():
         logger.info("Final training accuracy: %.4f", history.history['accuracy'][-1])
         logger.info("Final validation accuracy: %.4f", history.history['val_accuracy'][-1])
 
-        # Save the model locally using the newer format
-        local_model_path = '/opt/ml/model/model.keras'
-        logger.info("Saving model locally...")
-        tf.keras.models.save_model(
-            model,
-            local_model_path,
-            overwrite=True
-        )
-
-        # Upload the model to S3
-        s3 = boto3.client('s3')
-        bucket_name = 'bm-v1-model'
-        s3_model_path = 'trained_models/model.keras'
-        logger.info("Uploading model to S3...")
-        s3.upload_file(local_model_path, bucket_name, s3_model_path)
-        logger.info("Model uploaded successfully to s3://%s/%s", bucket_name, s3_model_path)
+        # Save the model directly to the SageMaker model directory
+        model.save('/opt/ml/model/model')
+        logger.info("Model saved to /opt/ml/model/model")
 
         logger.info("=== Training Process Complete ===")
 
