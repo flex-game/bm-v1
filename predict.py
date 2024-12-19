@@ -29,12 +29,12 @@ def predict_with_endpoint(endpoint_name, image_data, text_content):
         runtime = boto3.client('sagemaker-runtime')
         
         max_sequence_length = int(os.getenv('MAX_SEQUENCE_LENGTH', 512))
-        padded_text = preprocess_text(text_content, max_sequence_length)
+        padded_text = preprocess_text(text_content)
         
         payload = {
             "instances": [{
-                "inputs": image_data.tolist(),
-                "inputs_1": padded_text.tolist()
+                "image_input": image_data.tolist(),
+                "text_input": padded_text.tolist()
             }]
         }
         
