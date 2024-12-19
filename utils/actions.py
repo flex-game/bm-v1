@@ -86,3 +86,19 @@ def prepare_action_labels(force_refresh=False):
     
     logger.info(f"Prepared action labels: {action_mapping}")
     return action_mapping, len(action_list) 
+
+def load_action_mapping():
+    """Load action mapping from S3.
+    
+    Returns:
+        dict: Mapping of action names to indices
+    """
+    s3_client = boto3.client('s3')
+    try:
+        response = s3_client.get_object(Bucket='bm-v1-model', Key='action_mapping.json')
+        action_mapping = json.loads(response['Body'].read().decode('utf-8'))
+        logger.info("Loaded action mapping successfully")
+        return action_mapping
+    except Exception as e:
+        logger.error(f"Error loading action mapping: {str(e)}")
+        raise 
