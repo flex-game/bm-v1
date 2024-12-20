@@ -54,21 +54,23 @@ def main():
         num_actions = len(action_mapping)
         logger.info("Found %d unique actions", num_actions)
 
-        # After loading action mapping
         logger.info("Loading and preprocessing training data...")
         logger.info("This may take a while as we process all images and texts...")
         
-        # Add progress indicators for data loading
+        # First get the common files
+        logger.info("Finding common files in S3...")
+        common_files = s3_get_matching_files('bm-v1-training-images', 
+                                           'bm-v1-training-text', 
+                                           'bm-v1-training-actions')
+        logger.info(f"Found {len(common_files)} matching files")
+
+        # Then load the data using those common files
         logger.info("Loading data from S3...")
         raw_images, texts, labels = s3_load_data('bm-v1-training-images', 
                                                 'bm-v1-training-text', 
                                                 'bm-v1-training-actions', 
                                                 common_files)
-        logger.info("Loaded %d images, %d texts, and %d labels", 
-                   len(raw_images), len(texts), len(labels))
-        
-        logger.info("3. Creating tokenizer and processing texts...")
-        # ... rest of the code ...
+        logger.info(f"Loaded {len(raw_images)} images, {len(texts)} texts, and {len(labels)} labels")
 
         # Hyperparameters
         max_sequence_length = 50
@@ -85,13 +87,6 @@ def main():
                      loss='categorical_crossentropy', 
                      metrics=['accuracy'])
         
-        # Load common files
-        logger.info("Finding common files in S3...")
-        common_files = s3_get_matching_files('bm-v1-training-images', 
-                                           'bm-v1-training-text', 
-                                           'bm-v1-training-actions')
-        logger.info("Found %d matching files", len(common_files))
-
         # Preprocess images
         logger.info("Preprocessing images...")
         images = np.array([preprocess_image(BytesIO(img)) for img in raw_images])
