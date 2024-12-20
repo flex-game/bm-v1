@@ -4,6 +4,10 @@ import tensorflow as tf
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from io import BytesIO
 import pickle
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Load action mapping from S3
 def load_action_mapping():
@@ -30,12 +34,22 @@ def preprocess_image(image_data):
 def load_tokenizer():
     """Load the tokenizer from S3."""
     s3_client = boto3.client('s3')
-    # Adjust the path to where your latest model's tokenizer is stored
-    response = s3_client.get_object(
-        Bucket='bm-v1-model', 
-        Key='trained_models/tokenizer.pkl'
-    )
-    return pickle.loads(response['Body'].read())
+    try:
+        training_id = os.getenv('LATEST_STABLE_TRAINING')
+        if not training_id:
+            raise ValueError("LATEST_STABLE_TRAINING not set in .env")
+            
+        tokenizer_path = f"trained_models/bm-v1-training-{training_id}/output/preprocessing_info.pkl"
+        logger.info(f"Loading tokenizer from: {tokenizer_path}")
+        
+        response = s3_client.get_object(
+            Bucket='bm-v1-model',
+            Key=tokenizer_path
+        )
+        return pickle.loads(response['Body'].read())
+    except Exception as e:
+        logger.error(f"Error loading tokenizer: {str(e)}")
+        raise
 
 # Update the preprocess_text function to optionally load the tokenizer
 def preprocess_text(text, tokenizer=None, max_sequence_length=50):

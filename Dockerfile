@@ -1,5 +1,8 @@
 FROM tensorflow/tensorflow:2.14.0
 
+# Add SageMaker capability label
+LABEL com.amazonaws.sagemaker.capabilities=["train","serve"]
+
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     python3-pip \

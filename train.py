@@ -112,3 +112,14 @@ if __name__ == "__main__":
     
     # Start training
     estimator.fit(data_channels)
+    
+    # After training completes...
+    logger.info("Deploying model to endpoint...")
+    predictor = estimator.deploy(
+        initial_instance_count=1,
+        instance_type='ml.m5.xlarge',
+        entry_point='inference.py',
+        source_dir='code'
+    )
+    logger.info(f"New endpoint deployed: {predictor.endpoint_name}")
+    logger.info("Don't forget to update SAGEMAKER_ENDPOINT_NAME in .env!")
