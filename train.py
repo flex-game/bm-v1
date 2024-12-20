@@ -117,7 +117,7 @@ if __name__ == "__main__":
     logger.info("Deploying model to endpoint...")
     predictor = estimator.deploy(
         initial_instance_count=1,
-        instance_type='ml.m5.xlarge',
+        instance_type='ml.t2.medium',
         entry_point='inference.py',
         source_dir='code'
     )

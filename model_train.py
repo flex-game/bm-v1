@@ -59,13 +59,13 @@ def main():
         logger.info("This may take a while as we process all images and texts...")
         
         # Add progress indicators for data loading
-        logger.info("1. Loading image data from S3...")
-        images = load_images_from_s3()  # Your existing function
-        logger.info(f"   Loaded {len(images)} images")
-        
-        logger.info("2. Loading text descriptions...")
-        texts = load_text_descriptions()  # Your existing function
-        logger.info(f"   Loaded {len(texts)} text descriptions")
+        logger.info("Loading data from S3...")
+        raw_images, texts, labels = s3_load_data('bm-v1-training-images', 
+                                                'bm-v1-training-text', 
+                                                'bm-v1-training-actions', 
+                                                common_files)
+        logger.info("Loaded %d images, %d texts, and %d labels", 
+                   len(raw_images), len(texts), len(labels))
         
         logger.info("3. Creating tokenizer and processing texts...")
         # ... rest of the code ...
@@ -91,15 +91,6 @@ def main():
                                            'bm-v1-training-text', 
                                            'bm-v1-training-actions')
         logger.info("Found %d matching files", len(common_files))
-
-        # Load data from S3
-        logger.info("Loading data from S3...")
-        raw_images, texts, labels = s3_load_data('bm-v1-training-images', 
-                                                'bm-v1-training-text', 
-                                                'bm-v1-training-actions', 
-                                                common_files)
-        logger.info("Loaded %d images, %d texts, and %d labels", 
-                   len(raw_images), len(texts), len(labels))
 
         # Preprocess images
         logger.info("Preprocessing images...")
