@@ -54,6 +54,22 @@ def main():
         num_actions = len(action_mapping)
         logger.info("Found %d unique actions", num_actions)
 
+        # After loading action mapping
+        logger.info("Loading and preprocessing training data...")
+        logger.info("This may take a while as we process all images and texts...")
+        
+        # Add progress indicators for data loading
+        logger.info("1. Loading image data from S3...")
+        images = load_images_from_s3()  # Your existing function
+        logger.info(f"   Loaded {len(images)} images")
+        
+        logger.info("2. Loading text descriptions...")
+        texts = load_text_descriptions()  # Your existing function
+        logger.info(f"   Loaded {len(texts)} text descriptions")
+        
+        logger.info("3. Creating tokenizer and processing texts...")
+        # ... rest of the code ...
+
         # Hyperparameters
         max_sequence_length = 50
         num_words = 2500
