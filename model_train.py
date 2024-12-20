@@ -146,9 +146,20 @@ def main():
         logger.info("Final training accuracy: %.4f", history.history['accuracy'][-1])
         logger.info("Final validation accuracy: %.4f", history.history['val_accuracy'][-1])
 
-        # Save the model directly to the SageMaker model directory
+        # Save tokenizer BEFORE model saving
+        logger.info("Saving tokenizer...")
+        tokenizer_path = '/opt/ml/model/tokenizer.pkl'
+        with open(tokenizer_path, 'wb') as handle:
+            pickle.dump(tokenizer, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        logger.info(f"Tokenizer saved to {tokenizer_path}")
+
+        # Save model (only to /opt/ml/model/)
+        logger.info("Saving model...")
         model.save('/opt/ml/model/model')
         logger.info("Model saved to /opt/ml/model/model")
+
+        # Add debug logging to verify contents
+        logger.info(f"Contents of /opt/ml/model/: {os.listdir('/opt/ml/model/')}")
 
         logger.info("=== Training Process Complete ===")
 
