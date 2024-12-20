@@ -117,12 +117,6 @@ def main():
                 patience=3,
                 restore_best_weights=True
             ),
-            ModelCheckpoint(
-                filepath='checkpoints/model_{epoch:02d}.keras',  # NEW - changed .h5 to .keras
-                save_best_only=True,
-                monitor='val_loss',
-                mode='min'
-            ),
             ReduceLROnPlateau(
                 monitor='val_loss',
                 factor=0.5,
@@ -157,8 +151,8 @@ def main():
 
         # Save model (only to /opt/ml/model/)
         logger.info("Saving model...")
-        model.save('/opt/ml/model/model')
-        logger.info("Model saved to /opt/ml/model/model")
+        model.save('/opt/ml/model/model.keras')
+        logger.info("Model saved to /opt/ml/model/model.keras")
 
         # Add debug logging to verify contents
         logger.info(f"Contents of /opt/ml/model/: {os.listdir('/opt/ml/model/')}")

@@ -98,7 +98,9 @@ if __name__ == "__main__":
         hyperparameters=hyperparameters,
         output_path='s3://bm-v1-model/trained_models',
         code_location='s3://bm-v1-model/code',
-        model_dir='s3://bm-v1-model/trained_models'
+        model_dir='s3://bm-v1-model/trained_models',
+        enable_network_isolation=True,
+        image_config={"force_pull": True}
     )
     
     estimator.dependencies = ['code/']
