@@ -53,22 +53,25 @@ def main():
     logger.info("=== Starting Model Training Process ===")
     
     try:
-        # Load action mapping from SageMaker channel
+        # Debug: List contents of data directories
+        logger.info(f"Contents of training dir: {os.listdir('/opt/ml/input/data/training')}")
+        logger.info(f"Contents of text dir: {os.listdir('/opt/ml/input/data/text')}")
+        logger.info(f"Contents of actions dir: {os.listdir('/opt/ml/input/data/actions')}")
+        
+        # Load action mapping
         logger.info("Loading action mapping...")
         mapping_path = '/opt/ml/input/data/mapping/action_mapping.json'
         with open(mapping_path, 'r') as f:
             action_mapping = json.load(f)
         num_actions = len(action_mapping)
-        logger.info("Found %d unique actions", num_actions)
+        logger.info(f"Found {num_actions} unique actions")
 
-        # First get the common files from SageMaker channels
-        logger.info("Finding common files...")
-        training_path = '/opt/ml/input/data/training'
-        text_path = '/opt/ml/input/data/text'
-        actions_path = '/opt/ml/input/data/actions'
+        # Get file lists directly
+        training_files = set(os.listdir('/opt/ml/input/data/training'))
+        text_files = set(os.listdir('/opt/ml/input/data/text'))
+        action_files = set(os.listdir('/opt/ml/input/data/actions'))
         
-        # Update s3_get_matching_files to work with local paths
-        common_files = get_matching_files(training_path, text_path, actions_path)
+        common_files = sorted(list(training_files & text_files & action_files))
         logger.info(f"Found {len(common_files)} matching files")
 
         # Then load the data using those common files

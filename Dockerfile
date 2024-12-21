@@ -20,7 +20,8 @@ RUN pip3 install --no-cache-dir \
     python-dotenv \
     requests \
     tensorflow-hub \
-    tensorflow-text
+    tensorflow-text && \
+    python -c "from tensorflow.keras.applications import ResNet50; ResNet50(weights='imagenet')"
 
 # Set working directory
 WORKDIR /opt/ml/code
