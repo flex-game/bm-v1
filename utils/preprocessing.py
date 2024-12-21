@@ -66,3 +66,34 @@ def preprocess_text(text, tokenizer=None, max_sequence_length=50):
     sequences = tokenizer.texts_to_sequences([text])
     padded_sequences = pad_sequences(sequences, maxlen=max_sequence_length)
     return padded_sequences[0]
+
+def get_matching_files(images_path, text_path, actions_path):
+    """Get files that exist in all three directories"""
+    image_files = set(os.listdir(images_path))
+    text_files = set(os.listdir(text_path))
+    action_files = set(os.listdir(actions_path))
+    
+    # Find common files
+    common = image_files & text_files & action_files
+    return sorted(list(common))
+
+def load_data(images_path, text_path, actions_path, filenames):
+    """Load data from local paths instead of S3"""
+    images = []
+    texts = []
+    labels = []
+    
+    for filename in filenames:
+        # Load image
+        with open(os.path.join(images_path, filename), 'rb') as f:
+            images.append(f.read())
+            
+        # Load text
+        with open(os.path.join(text_path, filename), 'r') as f:
+            texts.append(f.read().strip())
+            
+        # Load action
+        with open(os.path.join(actions_path, filename), 'r') as f:
+            labels.append(json.load(f))
+    
+    return images, texts, labels

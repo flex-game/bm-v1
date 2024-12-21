@@ -107,9 +107,10 @@ if __name__ == "__main__":
     
     # Define data channels
     data_channels = {
-        'training': f's3://bm-v1-training-images',
-        'text': f's3://bm-v1-training-text',
-        'actions': f's3://bm-v1-training-actions'
+        'training': 's3://bm-v1-training-images',
+        'text': 's3://bm-v1-training-text',
+        'actions': 's3://bm-v1-training-actions',
+        'mapping': 's3://bm-v1-model'
     }
     
     # Start training

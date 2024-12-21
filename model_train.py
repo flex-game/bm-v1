@@ -6,14 +6,19 @@ from tensorflow.keras.preprocessing.text import Tokenizer
 from tensorflow.keras.optimizers import Adam
 import numpy as np
 from io import BytesIO
-from utils.preprocessing import load_action_mapping, preprocess_image, preprocess_text
-from utils.s3_utils import s3_get_matching_files, s3_load_data
+from utils.preprocessing import (
+    load_data,           # Local file version
+    get_matching_files,  # Local file version
+    preprocess_image, 
+    preprocess_text
+)
 import tensorflow as tf
 from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, ReduceLROnPlateau
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 import os
 import boto3
 import pickle
+import json
 
 def setup_logging():
     logging.basicConfig(
@@ -48,28 +53,30 @@ def main():
     logger.info("=== Starting Model Training Process ===")
     
     try:
-        # Load action mapping
+        # Load action mapping from SageMaker channel
         logger.info("Loading action mapping...")
-        action_mapping = load_action_mapping()
+        mapping_path = '/opt/ml/input/data/mapping/action_mapping.json'
+        with open(mapping_path, 'r') as f:
+            action_mapping = json.load(f)
         num_actions = len(action_mapping)
         logger.info("Found %d unique actions", num_actions)
 
-        logger.info("Loading and preprocessing training data...")
-        logger.info("This may take a while as we process all images and texts...")
+        # First get the common files from SageMaker channels
+        logger.info("Finding common files...")
+        training_path = '/opt/ml/input/data/training'
+        text_path = '/opt/ml/input/data/text'
+        actions_path = '/opt/ml/input/data/actions'
         
-        # First get the common files
-        logger.info("Finding common files in S3...")
-        common_files = s3_get_matching_files('bm-v1-training-images', 
-                                           'bm-v1-training-text', 
-                                           'bm-v1-training-actions')
+        # Update s3_get_matching_files to work with local paths
+        common_files = get_matching_files(training_path, text_path, actions_path)
         logger.info(f"Found {len(common_files)} matching files")
 
         # Then load the data using those common files
-        logger.info("Loading data from S3...")
-        raw_images, texts, labels = s3_load_data('bm-v1-training-images', 
-                                                'bm-v1-training-text', 
-                                                'bm-v1-training-actions', 
-                                                common_files)
+        logger.info("Loading data...")
+        raw_images, texts, labels = load_data(training_path, 
+                                            text_path, 
+                                            actions_path, 
+                                            common_files)
         logger.info(f"Loaded {len(raw_images)} images, {len(texts)} texts, and {len(labels)} labels")
 
         # Hyperparameters
