@@ -1,4 +1,5 @@
-FROM tensorflow/tensorflow:2.14.0
+# Explicitly set platform
+FROM --platform=linux/amd64 tensorflow/tensorflow:2.14.0
 
 # Add SageMaker capability label
 LABEL com.amazonaws.sagemaker.capabilities=["train","serve"]
@@ -9,7 +10,7 @@ RUN apt-get update && apt-get install -y \
     python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python packages (split into separate RUN commands for better debugging)
+# Install all packages in one layer to reduce image size
 RUN pip3 install --no-cache-dir \
     sagemaker-training \
     boto3 \
@@ -18,15 +19,14 @@ RUN pip3 install --no-cache-dir \
     pillow \
     scikit-learn \
     python-dotenv \
-    requests
-
-# Install TensorFlow-related packages separately
-RUN pip3 install --no-cache-dir \
+    requests \
     tensorflow-hub \
     tensorflow-text
 
-# Download ResNet50 weights in a separate step
-RUN python3 -c "import tensorflow as tf; tf.keras.applications.ResNet50(weights='imagenet', include_top=False)"
+# Pre-download weights without executing TensorFlow code
+RUN mkdir -p /root/.keras/models/ && \
+    wget https://storage.googleapis.com/tensorflow/keras-applications/resnet/resnet50_weights_tf_dim_ordering_tf_kernels_notop.h5 \
+    -O /root/.keras/models/resnet50_weights_tf_dim_ordering_tf_kernels_notop.h5
 
 # Set working directory
 WORKDIR /opt/ml/code
