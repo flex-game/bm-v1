@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y \
     python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python packages
+# Install Python packages (split into separate RUN commands for better debugging)
 RUN pip3 install --no-cache-dir \
     sagemaker-training \
     boto3 \
@@ -18,10 +18,15 @@ RUN pip3 install --no-cache-dir \
     pillow \
     scikit-learn \
     python-dotenv \
-    requests \
+    requests
+
+# Install TensorFlow-related packages separately
+RUN pip3 install --no-cache-dir \
     tensorflow-hub \
-    tensorflow-text && \
-    python -c "from tensorflow.keras.applications import ResNet50; ResNet50(weights='imagenet')"
+    tensorflow-text
+
+# Download ResNet50 weights in a separate step
+RUN python3 -c "import tensorflow as tf; tf.keras.applications.ResNet50(weights='imagenet', include_top=False)"
 
 # Set working directory
 WORKDIR /opt/ml/code
