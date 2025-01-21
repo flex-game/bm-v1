@@ -29,9 +29,11 @@ class Dataset:
 
         df = pd.DataFrame(self.raw_data)
 
-        # Clean actions
-        df['actions'] = df['actions'].apply(lambda x: list(set(x)))  # dedupe
-        df['actions'] = df['actions'].apply(lambda x: [action.replace('\n', ' ').replace('\r', ' ').strip() for action in x])  # remove special characters
+        # aggregate actions
+        # rm duplicate actions
+        # drop admin fields (filename) 
+        # drop unimportant fields (era_score)
+        # resize images
 
         # Store cleaned data
         self.cleaned_data = df
@@ -39,7 +41,18 @@ class Dataset:
         return df
     
     def embed_text(self, *args: Any, **kwargs: Any) -> Any:
-        pass
+        '''
+        Embed text using TF-IDF
+        '''
+
+        # Initialize CountVectorizer
+        vectorizer = CountVectorizer()
+
+        # Fit and transform the text data
+        text_embeddings = vectorizer.fit_transform(self.cleaned_data['game_state'].apply(lambda x: ' '.join(x)))
+
+        self.embeddings = text_embeddings.toarray()
+        return self.embeddings
 
     def embed_image(self, *args: Any, **kwargs: Any) -> Any:
         '''
