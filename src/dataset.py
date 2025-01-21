@@ -8,6 +8,7 @@ import pandas as pd
 from keras.applications.resnet50 import ResNet50, preprocess_input
 from keras.preprocessing import image
 from keras.models import Model
+from sklearn.preprocessing import LabelEncoder
 
 s3 = boto3.client('s3')
 
@@ -21,11 +22,13 @@ def preprocess_image(img_path):
 class Dataset:
     
     def __init__(self, dataset_path: str, image_folder: str = None) -> None:
-        self.raw_data = self.load_raw_data(dataset_path)
-        self.cleaned_data = None
-        self.embeddings = None
-        self.image_folder = image_folder
-        self.image_data = self.load_images() if image_folder else None
+        self.raw_data = self.load_raw_data(dataset_path) # Loads the raw data from a JSON file.
+        self.cleaned_data = None # Stores the cleaned data.
+        self.text_embeddings = None # Stores text embeddings for the game state.
+        self.image_embeddings = None # Stores image embeddings for the screenshot.
+        self.image_folder = image_folder # Image folder where the screenshots are stored.
+        self.image_data = self.load_images() if image_folder else None # Loads the images from the image folder.
+        self.label_encoder = LabelEncoder() # Encodes the output actions as labels.
 
     def load_raw_json(self, dataset_path: str) -> pd.DataFrame:
         '''
@@ -70,9 +73,16 @@ class Dataset:
         df['game_state'] = df['game_state'].apply(lambda x: x if isinstance(x, list) else [])
         df['game_state'] = df['game_state'].apply(lambda x: [text if text is not None else '' for text in x])
 
+        # Confirm valid "turn" value
+        df['turn'] = df['turn'].apply(lambda x: x if isinstance(x, str) and x.strip() else None)
+        df.dropna(subset=['turn'], inplace=True)
+
         # Handle missing turn data for image filenames
         df['screenshot'] = df['screenshot'].apply(lambda x: x if x in self.image_data else None)
         df.dropna(subset=['screenshot'], inplace=True)
+
+        # Encode actions as labels
+        df['actions_encoded'] = self.label_encoder.fit_transform(df['actions'])
 
         # Store cleaned data
         self.cleaned_data = df
@@ -113,3 +123,9 @@ class Dataset:
 
         self.image_embeddings = np.array(image_embeddings)
         return self.image_embeddings
+
+    def decode_actions(self, encoded_actions) -> list:
+        '''
+        Decodes numerical labels back to action text.
+        '''
+        return self.label_encoder.inverse_transform(encoded_actions)
