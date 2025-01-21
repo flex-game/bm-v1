@@ -12,17 +12,21 @@ from sklearn.preprocessing import LabelEncoder
 
 s3 = boto3.client('s3')
 
-def preprocess_image(img_path):
+def preprocess_image(img_path: str) -> np.ndarray:
+    '''
+    Preprocesses an image for embedding.
+    '''
     img = image.load_img(img_path, target_size=(224, 224))
     img_data = image.img_to_array(img)
     img_data = np.expand_dims(img_data, axis=0)
     img_data = preprocess_input(img_data)
+
     return img_data
 
 class Dataset:
     
     def __init__(self, dataset_path: str, image_folder: str = None) -> None:
-        self.raw_data = self.load_raw_data(dataset_path) # Loads the raw data from a JSON file.
+        self.raw_data = self.load_raw_json(dataset_path) # Loads the raw data from a JSON file.
         self.cleaned_data = None # Stores the cleaned data.
         self.text_embeddings = None # Stores text embeddings for the game state.
         self.image_embeddings = None # Stores image embeddings for the screenshot.
@@ -49,7 +53,7 @@ class Dataset:
                 image_data[filename] = preprocess_image(img_path)
         return image_data
 
-    def clean_json(self, *args: Any, **kwargs: Any) -> Any:
+    def clean_json(self) -> pd.DataFrame:
         '''
         Cleans the raw data, dropping some actions,
         protecting against null values, removing punctuation, 
@@ -89,7 +93,7 @@ class Dataset:
 
         return df
     
-    def embed_text(self, *args: Any, **kwargs: Any) -> Any:
+    def embed_text(self) -> np.ndarray:
         '''
         Embeds text using TF-IDF
         '''
@@ -101,9 +105,10 @@ class Dataset:
         text_embeddings = vectorizer.fit_transform(self.cleaned_data['game_state'].apply(lambda x: ' '.join(x)))
 
         self.text_embeddings = text_embeddings.toarray()
+        
         return self.text_embeddings
 
-    def embed_image(self, *args: Any, **kwargs: Any) -> Any:
+    def embed_image(self) -> np.ndarray:
         '''
         Embed images using ResNet50
         '''

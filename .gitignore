@@ -73,3 +73,6 @@ saved_model/
 
 # Data assets
 /data/assets
+
+# Test dataset
+data/test_dataset.json
