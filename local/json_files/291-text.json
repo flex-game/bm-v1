@@ -1,1 +1,0 @@
-{"turn": 9, "science_per_turn": 3.5, "culture_per_turn": 1.8, "gold_per_turn": 2, "faith_per_turn": 0, "military_power": 20, "city_count": 1, "unit_count": 3, "units": [{"name": "Warrior"}, {"name": "Scout"}, {"name": "Settler"}], "cities": [{"name": "Auckland"}], "current_research": "Animal Husbandry", "current_civic": "Code of Laws", "era_score": "0 / 8"}
