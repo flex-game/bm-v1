@@ -20,20 +20,45 @@ def preprocess_image(img_path):
 
 class Dataset:
     
-    def __init__(self, raw_data: pd.DataFrame) -> None:
-        self.raw_data = raw_data
+    def __init__(self, dataset_path: str, image_folder: str = None) -> None:
+        self.raw_data = self.load_raw_data(dataset_path)
         self.cleaned_data = None
         self.embeddings = None
+        self.image_folder = image_folder
+        self.image_data = self.load_images() if image_folder else None
+
+    def load_raw_data(self, dataset_path: str) -> pd.DataFrame:
+        with open(dataset_path, 'r') as f:
+            data = json.load(f)
+        return pd.DataFrame(data)
+
+    def load_images(self) -> dict:
+        image_data = {}
+        for filename in os.listdir(self.image_folder):
+            if filename.endswith('.jpg'):
+                img_path = os.path.join(self.image_folder, filename)
+                image_data[filename] = preprocess_image(img_path)
+        return image_data
 
     def clean(self, *args: Any, **kwargs: Any) -> Any:
 
         df = pd.DataFrame(self.raw_data)
 
-        # aggregate actions
-        # rm duplicate actions
-        # drop admin fields (filename) 
-        # drop unimportant fields (era_score)
-        # resize images
+        # Drops all actions but the first (multi-action prediction not supported yet)
+        df['actions'] = df['actions'].apply(lambda x: x[0] if isinstance(x, list) and len(x) > 0 else '')
+
+        # Clean actions data
+        df['actions'] = df['actions'].str.lower().str.replace('[^\w\s]', '')
+
+        # Clean game_state data
+        df['game_state'] = df['game_state'].apply(lambda x: [text.lower().replace('[^\w\s]', '') for text in x])
+
+        # Handle null or missing values in 'actions' column
+        df['actions'] = df['actions'].fillna('')
+
+        # Handle null or missing values in 'game_state' column
+        df['game_state'] = df['game_state'].apply(lambda x: x if isinstance(x, list) else [])
+        df['game_state'] = df['game_state'].apply(lambda x: [text if text is not None else '' for text in x])
 
         # Store cleaned data
         self.cleaned_data = df
@@ -64,12 +89,13 @@ class Dataset:
         model = Model(inputs=base_model.input, outputs=base_model.get_layer('avg_pool').output)
 
         image_embeddings = []
-        for img_path in args:
-            img_data = preprocess_image(img_path)
-            embedding = model.predict(img_data)
-            image_embeddings.append(embedding.flatten())
+        for img_name in self.cleaned_data['screenshot']:
+            if img_name in self.image_data:
+                img_data = self.image_data[img_name]
+                embedding = model.predict(img_data)
+                image_embeddings.append(embedding.flatten())
+            else:
+                image_embeddings.append(np.zeros((2048,)))  # Assuming 2048 is the output size of avg_pool layer
 
         self.embeddings = np.array(image_embeddings)
         return self.embeddings
-
-        
