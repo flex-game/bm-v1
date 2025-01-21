@@ -27,12 +27,18 @@ class Dataset:
         self.image_folder = image_folder
         self.image_data = self.load_images() if image_folder else None
 
-    def load_raw_data(self, dataset_path: str) -> pd.DataFrame:
+    def load_raw_json(self, dataset_path: str) -> pd.DataFrame:
+        '''
+        Loads the raw data from a JSON file.
+        '''
         with open(dataset_path, 'r') as f:
             data = json.load(f)
         return pd.DataFrame(data)
 
     def load_images(self) -> dict:
+        '''
+        Loads the images from the image folder.
+        '''
         image_data = {}
         for filename in os.listdir(self.image_folder):
             if filename.endswith('.jpg'):
@@ -40,8 +46,12 @@ class Dataset:
                 image_data[filename] = preprocess_image(img_path)
         return image_data
 
-    def clean(self, *args: Any, **kwargs: Any) -> Any:
-
+    def clean_json(self, *args: Any, **kwargs: Any) -> Any:
+        '''
+        Cleans the raw data, dropping some actions,
+        protecting against null values, removing punctuation, 
+        and handling missing turn data for image filenames.
+        '''
         df = pd.DataFrame(self.raw_data)
 
         # Drops all actions but the first (multi-action prediction not supported yet)
@@ -60,6 +70,10 @@ class Dataset:
         df['game_state'] = df['game_state'].apply(lambda x: x if isinstance(x, list) else [])
         df['game_state'] = df['game_state'].apply(lambda x: [text if text is not None else '' for text in x])
 
+        # Handle missing turn data for image filenames
+        df['screenshot'] = df['screenshot'].apply(lambda x: x if x in self.image_data else None)
+        df.dropna(subset=['screenshot'], inplace=True)
+
         # Store cleaned data
         self.cleaned_data = df
 
@@ -67,7 +81,7 @@ class Dataset:
     
     def embed_text(self, *args: Any, **kwargs: Any) -> Any:
         '''
-        Embed text using TF-IDF
+        Embeds text using TF-IDF
         '''
 
         # Initialize CountVectorizer
@@ -76,8 +90,8 @@ class Dataset:
         # Fit and transform the text data
         text_embeddings = vectorizer.fit_transform(self.cleaned_data['game_state'].apply(lambda x: ' '.join(x)))
 
-        self.embeddings = text_embeddings.toarray()
-        return self.embeddings
+        self.text_embeddings = text_embeddings.toarray()
+        return self.text_embeddings
 
     def embed_image(self, *args: Any, **kwargs: Any) -> Any:
         '''
@@ -97,5 +111,5 @@ class Dataset:
             else:
                 image_embeddings.append(np.zeros((2048,)))  # Assuming 2048 is the output size of avg_pool layer
 
-        self.embeddings = np.array(image_embeddings)
-        return self.embeddings
+        self.image_embeddings = np.array(image_embeddings)
+        return self.image_embeddings
