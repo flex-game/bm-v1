@@ -1,0 +1,1 @@
+{"turn": 7, "science_per_turn": 2, "culture_per_turn": 1, "gold_per_turn": 0, "faith_per_turn": 0, "military_power": 35, "city_count": 1, "unit_count": 2, "units": [{"name": "Eagle Warrior"}, {"name": "Builder"}], "cities": [{"name": "Tenochtitlan"}], "current_research": "Archery", "current_civic": "Code of Laws", "era_score": null}

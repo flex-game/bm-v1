@@ -1,0 +1,1 @@
+{"turn": 9, "science_per_turn": 5, "culture_per_turn": 2, "gold_per_turn": 20, "faith_per_turn": null, "military_power": 125, "city_count": null, "unit_count": 3, "units": [{"name": "Scout"}, {"name": "Slinger"}, {"name": "Slinger"}], "cities": [], "current_research": "Archery", "current_civic": "Craftsmanship", "era_score": null}

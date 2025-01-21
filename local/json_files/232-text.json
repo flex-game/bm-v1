@@ -1,0 +1,1 @@
+{"turn": 1, "science_per_turn": 2, "culture_per_turn": 1, "gold_per_turn": 0, "faith_per_turn": 0, "military_power": null, "city_count": 1, "unit_count": 3, "units": [{"name": "Scout"}, {"name": "Settler"}, {"name": "Builder"}], "cities": [{"name": "Washington"}], "current_research": "Mining", "current_civic": "Code of Laws", "era_score": null}

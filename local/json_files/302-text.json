@@ -1,0 +1,1 @@
+{"turn": 2, "science_per_turn": 2.5, "culture_per_turn": 1.2, "gold_per_turn": 0, "faith_per_turn": 0, "military_power": null, "city_count": 1, "unit_count": 4, "units": [{"name": "Warrior"}, {"name": "Scout"}, {"name": "Builder"}, {"name": "Settler"}], "cities": [{"name": "Paris"}], "current_research": "Pottery", "current_civic": "Code of Laws", "era_score": "0 / 8"}

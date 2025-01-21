@@ -5,7 +5,7 @@ import logging
 from botocore.exceptions import NoCredentialsError, PartialCredentialsError
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def get_s3_client():
     try:
@@ -15,7 +15,7 @@ def get_s3_client():
             aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
             region_name=os.getenv('AWS_REGION')
         )
-        logging.info("S3 client session created successfully.")
+        logging.debug("S3 client session created successfully.")
         return session.client('s3')
     except (NoCredentialsError, PartialCredentialsError) as e:
         logging.error(f"Error: {e}")
@@ -27,7 +27,9 @@ def txt_to_json(s3, bucket_name, prefix):
         return
 
     response = list_s3_objects(s3, bucket_name, prefix)
-    for obj in response.get('Contents', []):  # Process all objects
+    logging.debug(f"S3 objects response: {response}")
+    for obj in response.get('Contents', []):  
+        logging.debug(f"Processing object: {obj['Key']}")
         txt_file_path = download_txt_file(s3, bucket_name, obj['Key'])
         json_content = convert_txt_to_json(txt_file_path)
         json_file_path = save_json_to_file(json_content, txt_file_path)
@@ -44,54 +46,63 @@ def download_txt_file(s3, bucket_name, key):
     logging.info(f"Downloaded file '{key}' to '{txt_file_path}'.")
     return txt_file_path
 
-def convert_txt_to_json(txt_file_path):
-    def parse_text_file(content):
-        """Parse a single text file's content.
-        
-        Args:
-            content (str): Raw content of text file
-        
-        Returns:
-            list: List of actions by player
-        """
-        try:
-            # Remove markdown code block formatting
-            content = content.replace('```json', '').replace('```', '').strip()
-            
-            # Handle empty files
-            if not content:
-                return []
-                
-            action_data = json.loads(content)
-            
-            # Handle case where action_data might be None
-            if action_data is None:
-                return []
-                
-            # Handle case where actions_by_player might be None
-            return action_data.get('actions_by_player', [])
-            
-        except Exception as e:
-            logging.warning(f"Error parsing action file: {str(e)}")
-            return []
+def parse_text_file(content):
+    """Parse a single text file's content.
+    
+    Args:
+        content (str): Raw content of text file
+    
+    Returns:
+        dict: Parsed JSON-like dictionary
+    """
+    # Remove markdown code block formatting like we do with actions
+    content = content.replace('```json', '').replace('```', '').strip()
+    
+    # Handle empty files
+    if not content:
+        return {}
+    
+    data = {
+        "turn": None,
+        "science_per_turn": None,
+        "culture_per_turn": None,
+        "gold_per_turn": None,
+        "faith_per_turn": None,
+        "military_power": None,
+        "city_count": None,
+        "unit_count": None,
+        "units": [],
+        "cities": [],
+        "current_research": None,
+        "current_civic": None,
+        "era_score": None
+    }
 
+    # Parse the content to fill the dictionary
+    try:
+        # Attempt to load the content as JSON
+        parsed_content = json.loads(content)
+        for key in data.keys():
+            if key in parsed_content:
+                data[key] = parsed_content[key]
+    except json.JSONDecodeError:
+        logging.error("Failed to decode JSON content.")
+    
+    return data
+
+def convert_txt_to_json(txt_file_path):
+    logging.debug(f"Converting '{txt_file_path}' to JSON.")
     with open(txt_file_path, 'r') as txt_file:
         content = txt_file.read()
-    try:
-        actions = parse_text_file(content)
-        content_dict = {
-            "actions_by_player": actions
-        }
-        logging.info(f"Successfully converted '{txt_file_path}' to JSON format.")
-        return json.dumps(content_dict)
-    except json.JSONDecodeError:
-        logging.error(f"Failed to convert '{txt_file_path}' to JSON format due to JSONDecodeError.")
-        return json.dumps({"content": content})
+
+        json_content = parse_text_file(content)
+        logging.debug(f"Generated JSON content: {json_content}")
+        return json_content
 
 def save_json_to_file(json_content, txt_file_path):
     json_file_path = txt_file_path.replace('.txt', '.json')
     with open(json_file_path, 'w') as json_file:
-        json_file.write(json_content)
+        json_file.write(json.dumps(json_content))
     logging.info(f"Converted '{txt_file_path}' to JSON and saved as '{json_file_path}'.")
     return json_file_path
 
@@ -101,7 +112,7 @@ def save_json_locally(json_content, key):
     logging.debug(f"Directory created: {local_dir}")
     json_key = os.path.join(local_dir, os.path.basename(key).replace('.txt', '.json'))
     with open(json_key, 'w') as json_file:
-        json_file.write(json_content)
+        json_file.write(json.dumps(json_content))
     logging.debug(f"File written: {json_key}")
 
 def clean_up(txt_file_path):
@@ -110,7 +121,7 @@ def clean_up(txt_file_path):
 
 
 def main():
-    bucket_name = 'bm-v1-training-actions'
+    bucket_name = 'bm-v1-training-text'
     prefix = ''
 
     s3 = get_s3_client()

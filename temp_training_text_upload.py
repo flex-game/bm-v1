@@ -44,7 +44,7 @@ def upload_files_to_s3(s3, bucket_name, local_directory):
                     logging.error(f"Failed to upload '{local_file_path}' to S3: {e}")
 
 def main():
-    bucket_name = 'bm-v1-training-actions-json'
+    bucket_name = 'bm-v1-training-text-json'
     local_directory = 'local/json_files/'
 
     s3 = get_s3_client()

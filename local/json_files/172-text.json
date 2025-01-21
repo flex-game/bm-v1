@@ -1,0 +1,1 @@
+{"turn": 1, "science_per_turn": 2, "culture_per_turn": 0, "gold_per_turn": 0, "faith_per_turn": 0, "military_power": 40, "city_count": 1, "unit_count": 4, "units": [{"name": "Settler"}, {"name": "Builder"}, {"name": "Scout"}, {"name": "Warrior"}], "cities": [{"name": "Stockholm"}], "current_research": "Animal Husbandry", "current_civic": "Code of Laws", "era_score": null}
