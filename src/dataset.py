@@ -25,6 +25,7 @@ class Dataset:
         self.image_embeddings = self.load_and_embed_images()
         self.text_embeddings = self.embed_text()
         self.labels = self.label_actions()    
+        self.model = self.build_model()
 
     def load_raw_data(self):
         '''
@@ -189,3 +190,27 @@ class Dataset:
         action_labels = label_encoder.fit_transform(actions)
         
         return action_labels
+    
+    def build_model(self):
+        input_shape_image = self.image_embeddings.shape[1:]  # Shape of image embeddings
+        input_shape_text = self.text_embeddings.shape[1:]  # Shape of text embeddings
+        num_classes = len(np.unique(self.labels))
+
+        # Define the image input
+        image_input = Input(shape=input_shape_image, name='image_input')
+        base_model = ResNet50(weights='imagenet', include_top=False, input_tensor=image_input)
+        x = base_model.output
+        x = Dense(1024, activation='relu')(x)
+
+        # Define the text input
+        text_input = Input(shape=input_shape_text, name='text_input')
+        y = Dense(512, activation='relu')(text_input)
+
+        # Concatenate the outputs
+        combined = Concatenate()([x, y])
+        z = Dense(num_classes, activation='softmax')(combined)
+
+        # Create the model
+        model = Model(inputs=[image_input, text_input], outputs=z)
+        
+        return model
