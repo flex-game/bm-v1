@@ -74,19 +74,23 @@ class Dataset:
 
     def embed_text(self) -> np.ndarray:
         '''
-        Embeds text using TF-IDF
+        Embeds text using Keras TextVectorization
         '''
         logging.debug("Embedding text data")
-        # Initialize CountVectorizer
-        vectorizer = CountVectorizer()
-
-        # Fit and transform the text data
-        text_embeddings = vectorizer.fit_transform(self.cleaned_data['game_state'].apply(lambda x: ' '.join(x)))
-
-        self.text_embeddings = text_embeddings.toarray()
+        
+        # Initialize TextVectorization layer
+        vectorizer = TextVectorization(output_mode='tf-idf')
+        
+        # Adapt the vectorizer to the text data
+        vectorizer.adapt(self.cleaned_data['game_state'].apply(lambda x: ' '.join(x)))
+        
+        # Transform the text data
+        text_embeddings = vectorizer(self.cleaned_data['game_state'].apply(lambda x: ' '.join(x)))
+        
+        text_embeddings = text_embeddings.numpy()
         logging.debug("Text embeddings generated")
         
-        return self.text_embeddings
+        return text_embeddings
 
     def clean_data(self):
         '''
