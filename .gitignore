@@ -76,3 +76,6 @@ saved_model/
 
 # Test dataset
 data/test_dataset.json
+
+# Model file
+model.keras

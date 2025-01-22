@@ -1,14 +1,14 @@
 import boto3
 from PIL import Image
-from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
+from sklearn.feature_extraction.text import TfidfVectorizer
 import os
 import json
 import numpy as np
 import pandas as pd
-from keras.applications.resnet50 import ResNet50, preprocess_input
-from keras.layers import TextVectorization
-from keras.preprocessing import image
-from keras.models import Model
+from tensorflow.keras.applications.resnet50 import ResNet50, preprocess_input
+from tensorflow.keras.layers import TextVectorization, Input, Dense, Concatenate, Flatten
+from tensorflow.keras.preprocessing import image
+from tensorflow.keras.models import Model
 from sklearn.preprocessing import LabelEncoder
 
 s3 = boto3.client('s3')
@@ -192,15 +192,14 @@ class Dataset:
         return action_labels
     
     def build_model(self):
-        input_shape_image = self.image_embeddings.shape[1:]  # Shape of image embeddings
-        input_shape_text = self.text_embeddings.shape[1:]  # Shape of text embeddings
+        # Define the input shapes
+        input_shape_image = self.image_embeddings.shape[1:]  # Image embeddings input shape
+        input_shape_text = self.text_embeddings.shape[1:]  # Text input shape
         num_classes = len(np.unique(self.labels))
 
         # Define the image input
         image_input = Input(shape=input_shape_image, name='image_input')
-        base_model = ResNet50(weights='imagenet', include_top=False, input_tensor=image_input)
-        x = base_model.output
-        x = Dense(1024, activation='relu')(x)
+        x = Dense(1024, activation='relu')(image_input)
 
         # Define the text input
         text_input = Input(shape=input_shape_text, name='text_input')

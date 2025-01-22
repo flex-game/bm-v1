@@ -1,12 +1,9 @@
 import logging
-import sagemaker
 import boto3
-from tensorflow.keras.applications import ResNet50
-from tensorflow.keras.layers import Dense, Concatenate, Input
-from tensorflow.keras.models import Model, load_model
-from sklearn.feature_extraction.text import TfidfVectorizer
 import numpy as np
-from src.dataset import Dataset  # Import the Dataset class
+from dataset import Dataset
+from tensorflow.keras.models import load_model
+import sys
 
 s3 = boto3.client('s3')
 
@@ -23,29 +20,16 @@ def train():
     logger.info("=== Starting Train ===")
 
     # Load the dataset
-    dataset = Dataset(dataset_path='data/dataset.json', image_folder='data/images')
+    dataset = Dataset(dataset_path='data/dataset.json', image_folder='data/assets')
 
-    # Get the embeddings and labels
-    image_embeddings = dataset.image_embeddings
-    text_embeddings = dataset.text_embeddings
-    labels = dataset.labels
-    num_classes = len(np.unique(labels))
-
-    # One-hot encode the labels
-    labels = np.eye(num_classes)[labels]
-
-    # Define input shapes
-    input_shape_image = image_embeddings.shape[1:]  # Shape of image embeddings
-    input_shape_text = text_embeddings.shape[1:]  # Shape of text embeddings
-
-    # Build the model
-    model = build_model(input_shape_image, input_shape_text, num_classes)
+    # The model is already built and compiled in the Dataset class
+    model = dataset.model
 
     # Compile the model
-    model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+    model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
 
     # Train the model
-    model.fit([image_embeddings, text_embeddings], labels, epochs=10, batch_size=32)
+    model.fit([dataset.image_embeddings, dataset.text_embeddings], dataset.labels, epochs=10, batch_size=32)
 
     # Save the model
     model.save('model.keras')
@@ -64,4 +48,22 @@ def predict():
     text_data = np.random.rand(1, 5000)  # Replace with actual text data
     prediction = model.predict([image_data, text_data])
     
-    print(prediction)       
+    print(prediction)
+
+def main():
+    if len(sys.argv) < 2:
+        print("Usage: python predict.py <train|predict>")
+        sys.exit(1)
+
+    command = sys.argv[1].lower()
+
+    if command == "train":
+        train()
+    elif command == "predict":
+        predict()
+    else:
+        print("Invalid command. Use 'train' or 'predict'.")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
