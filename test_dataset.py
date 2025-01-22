@@ -15,6 +15,7 @@ class TestDataset(unittest.TestCase):
         
         # Create a Dataset instance
         self.dataset = Dataset(self.dataset_path, self.image_folder)
+        
         logging.debug("Dataset initialized.")
 
     def test_load_raw_data(self):

@@ -1,27 +1,27 @@
 import boto3
 from PIL import Image
-from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 import os
 import json
 import numpy as np
 import pandas as pd
 from keras.applications.resnet50 import ResNet50, preprocess_input
+from keras.layers.experimental.preprocessing import TextVectorization
 from keras.preprocessing import image
 from keras.models import Model
 from sklearn.preprocessing import LabelEncoder
-import logging
 
 s3 = boto3.client('s3')
 
 class Dataset:
     
-    def __init__(self, dataset_path: str, image_folder: str = None, embeddings_path=None) -> None:
-        logging.info("Initializing Dataset with path: %s and image folder: %s", dataset_path, image_folder)
+    def __init__(self, dataset_path: str, image_folder: str = None) -> None:
         self.dataset_path = dataset_path
         self.image_folder = image_folder
         self.raw_data = self.load_raw_data()
-        self.images_list = self.load_images_list()
+        self.raw_images_list = self.load_raw_images_list()
         self.cleaned_data = self.clean_data()
+        self.cleaned_images_list = self.list_cleaned_images()
         self.image_embeddings = self.load_and_embed_images()
         self.text_embeddings = self.embed_text()
         # self.labels = self.create_labels()
@@ -34,20 +34,15 @@ class Dataset:
             data = json.load(f)
         return pd.DataFrame(data)
     
-    def load_images_list(self):
+    def load_raw_images_list(self):
         '''
         Loads all image filenames from the image_folder
         (.jpg only)
         '''
         if not self.image_folder:
-            logging.warning("Image folder not provided.")
             return []
 
-        images_list = []
-        for filename in os.listdir(self.image_folder):
-            images_list.append(filename)
-        
-        logging.info("Loaded %d images from %s", len(images_list), self.image_folder)
+        images_list = self.raw_data['screenshot'].tolist()
 
         return images_list
 
@@ -79,55 +74,85 @@ class Dataset:
         df['game_state'] = df['game_state'].apply(lambda x: x if isinstance(x, list) else [])
         df['game_state'] = df['game_state'].apply(lambda x: [text if text is not None else '' for text in x])
 
-        # Drop entries with no "screenshot" data
+        # Drop entries with no "screenshot" data or that aren't .jpgs
         df.dropna(subset=['screenshot'], inplace=True)
+        df = df[df['screenshot'].str.endswith('.jpg')]
 
-        # Drops turns that don't have an image
-        self.images_list = self.load_images_list()
-        df = df[df['screenshot'].apply(lambda x: x in self.images_list)]
+        # Force "screenshot" values to strings
+        df['screenshot'] = df['screenshot'].astype(str)
 
-        # Store cleaned data
-        logging.debug("Example cleaned data: %s", df.head())
-        logging.debug("Cleaned data columns: %s", df.columns)
-        logging.debug("Cleaned data stored")
+        # Remove data/assets/ prefix from screenshot filenames
+        df['screenshot'] = df['screenshot'].apply(lambda x: x.replace('data/assets/', ''))
 
         return df
+
+    def list_cleaned_images(self):
+        '''
+        Lists all cleaned image filenames
+        '''
+
+        images_list = self.cleaned_data['screenshot'].tolist()
+        
+        return images_list
+
 
     def load_and_embed_images(self):
         '''
         Loads and embeds images using ResNet50
         '''
-        logging.info("Loading and embedding images")
-        preprocessed_images = self.preprocess_images()
-        image_embeddings = self.embed_images()
+
+        model = self._load_images_model()
+
+        preprocessed_images = self._preprocess_images()
+        image_embeddings = self._embed_images(preprocessed_images, model)
         return image_embeddings
 
-    def _preprocess_images(image_folder: str) -> np.ndarray:
+    def _load_images_model(self):
+        '''
+        Loads the ResNet model used in _embed_images
+        '''
+        
+        # Load the ResNet50 model pre-trained on ImageNet
+        base_model = ResNet50(weights='imagenet', include_top=False)
+
+        # Create a new model that outputs the embeddings
+        model = Model(inputs=base_model.input, outputs=base_model.output)
+
+        return model
+
+    def _preprocess_images(self) -> np.ndarray:
         '''
         Helper function to load and preprocess images for ResNet50 embedding
         '''
-        logging.info("Loading and preprocessing images from folder: %s", image_folder)
-        image_paths = [os.path.join(image_folder, filename) for filename in os.listdir(image_folder) if filename.endswith('.jpg')]
-        preprocessed_images = self.preprocess_images(image_paths)
+        preprocessed_images = []
+        
+        for filename in self.cleaned_images_list:
+            image_path = os.path.join(self.image_folder, filename)
+            # Load image
+            img = image.load_img(image_path, target_size=(224, 224))
+            # Convert image to array
+            img_array = image.img_to_array(img)
+            # Expand dimensions to match the input shape of ResNet50
+            img_array = np.expand_dims(img_array, axis=0)
+            # Preprocess the image for ResNet50
+            img_array = preprocess_input(img_array)
+            preprocessed_images.append(img_array)
+        
+        # Convert list to numpy array
+        preprocessed_images = np.vstack(preprocessed_images)
         
         return preprocessed_images
 
-    def _embed_images(preprocessed_images: np.ndarray) -> np.ndarray:
+    def _embed_images(self, preprocessed_images: np.ndarray, model: Model) -> np.ndarray:
         '''
         Embeds preprocessed images using ResNet50
         '''
-        logging.debug("Embedding preprocessed image data")
-    
-        # Load ResNet50 model pre-trained on ImageNet
-        base_model = ResNet50(weights='imagenet')
-        model = Model(inputs=base_model.input, outputs=base_model.get_layer('avg_pool').output)
-
+        
         # Assumes preprocessed_images is an array of preprocessed images
         embeddings = model.predict(preprocessed_images)
 
         # Flatten the embeddings
         image_embeddings = embeddings.reshape(embeddings.shape[0], -1)
-        logging.debug("Image embeddings generated")
 
         return image_embeddings
 
@@ -135,8 +160,7 @@ class Dataset:
         '''
         Embeds text using Keras TextVectorization
         '''
-        logging.debug("Embedding text data")
-        
+
         # Initialize TextVectorization layer
         vectorizer = TextVectorization(output_mode='tf-idf')
         
@@ -147,6 +171,5 @@ class Dataset:
         text_embeddings = vectorizer(self.cleaned_data['game_state'].apply(lambda x: ' '.join(x)))
         
         text_embeddings = text_embeddings.numpy()
-        logging.debug("Text embeddings generated")
         
         return text_embeddings
