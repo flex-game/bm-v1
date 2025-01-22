@@ -1,69 +1,32 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
-*$py.class
 
 # C extensions
 *.so
 
 # Distribution / packaging
-.Python
 build/
-develop-eggs/
 dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
 *.egg-info/
-.installed.cfg
 *.egg
-MANIFEST
-
-# PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds the exe, so as to inject date/other infos into it.
-*.manifest
-*.spec
 
 # Installer logs
 pip-log.txt
-pip-delete-this-directory.txt
 
 # Unit test / coverage reports
 htmlcov/
 .tox/
-.nox/
 .coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
 .pytest_cache/
-cover/
-
-# Translations
-*.mo
-*.pot
 
 # Django stuff:
 *.log
 local_settings.py
 db.sqlite3
-db.sqlite3-journal
 
 # Flask stuff:
 instance/
-.webassets-cache
 
 # Scrapy stuff:
 .scrapy
@@ -71,68 +34,17 @@ instance/
 # Sphinx documentation
 docs/_build/
 
-# PyBuilder
-.pybuilder/
-target/
-
 # Jupyter Notebook
 .ipynb_checkpoints
-
-# IPython
-profile_default/
-ipython_config.py
-
-# pyenv
-#   For a library or package, you might want to ignore these files since the code is
-#   intended to run in multiple environments; otherwise, check them in:
-# .python-version
-
-# pipenv
-#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
-#   However, in case of collaboration, if having platform-specific dependencies or dependencies
-#   having no cross-platform support, pipenv may install dependencies that don't work, or not
-#   install all needed dependencies.
-#Pipfile.lock
-
-# poetry
-#   Similar to Pipfile.lock, it is generally recommended to include poetry.lock in version control.
-#   This is especially recommended for binary packages to ensure reproducibility, and is more
-#   commonly ignored for libraries.
-#   https://python-poetry.org/docs/basic-usage/#commit-your-poetrylock-file-to-version-control
-#poetry.lock
-
-# pdm
-#   Similar to Pipfile.lock, it is generally recommended to include pdm.lock in version control.
-#pdm.lock
-#   pdm stores project-wide configurations in .pdm.toml, but it is recommended to not include it
-#   in version control.
-#   https://pdm.fming.dev/latest/usage/project/#working-with-version-control
-.pdm.toml
-.pdm-python
-.pdm-build/
-
-# PEP 582; used by e.g. github.com/David-OConnor/pyflow and github.com/pdm-project/pdm
-__pypackages__/
-
-# Celery stuff
-celerybeat-schedule
-celerybeat.pid
-
-# SageMath parsed files
-*.sage.py
 
 # Environments
 .env
 .venv
 env/
 venv/
-ENV/
-env.bak/
-venv.bak/
 
 # Spyder project settings
 .spyderproject
-.spyproject
 
 # Rope project settings
 .ropeproject
@@ -142,8 +54,6 @@ venv.bak/
 
 # mypy
 .mypy_cache/
-.dmypy.json
-dmypy.json
 
 # Pyre type checker
 .pyre/
@@ -155,15 +65,59 @@ dmypy.json
 cython_debug/
 
 # PyCharm
-#  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
-#  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
-#  and can be added to the global gitignore or merged into this file.  For a more nuclear
-#  option (not recommended) you can uncomment the following to ignore the entire idea folder.
-#.idea/
+# .idea/
 preprocessing_info.pkl
 trained_model.h5
 model.tar.gz
-saved_model/fingerprint.pb
-saved_model/saved_model.pb
-saved_model/variables/variables.data-00000-of-00001
-saved_model/variables/variables.index
+saved_model/
+
+# Data assets
+/data/assets
+/data/assets/predict/
+
+# Test dataset
+data/test_dataset.json
+
+# Model file
+model.keras
+
+data/predict/1.jpg
+data/predict/2.jpg
+data/predict/3.jpg
+data/predict/4.jpg
+data/predict/5.jpg
+data/predict/6.jpg
+data/predict/7.jpg
+data/predict/8.jpg
+data/predict/9.jpg
+data/predict/10.jpg
+data/predict/11.jpg
+data/predict/12.jpg
+data/predict/13.jpg
+data/predict/14.jpg
+data/predict/15.jpg
+data/predict/16.jpg
+data/predict/17.jpg
+data/predict/18.jpg
+data/predict/19.jpg
+data/predict/20.jpg
+data/predict/21.jpg
+data/predict/22.jpg
+data/predict/23.jpg
+data/predict/24.jpg
+data/predict/25.jpg
+data/predict/26.jpg
+data/predict/27.jpg
+data/predict/28.jpg
+data/predict/29.jpg
+data/predict/30.jpg
+data/predict/31.jpg
+data/predict/32.jpg
+data/predict/33.jpg
+data/predict/34.jpg
+data/predict/35.jpg
+data/predict/36.jpg
+data/predict/37.jpg
+data/predict/38.jpg
+data/predict/39.jpg
+data/predict/40.jpg
