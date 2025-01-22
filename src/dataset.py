@@ -19,20 +19,79 @@ class Dataset:
         logging.info("Initializing Dataset with path: %s and image folder: %s", dataset_path, image_folder)
         self.dataset_path = dataset_path
         self.image_folder = image_folder
-        self.raw_text = self.load_raw_text()
+        self.raw_data = self.load_raw_data()
+        self.images_list = self.load_images_list()
+        self.cleaned_data = self.clean_data()
         self.image_embeddings = self.load_and_embed_images()
         self.text_embeddings = self.embed_text()
-        self.cleaned_data = self.clean_data()
-        self.labels = self.create_labels()
+        # self.labels = self.create_labels()
 
-    def load_raw_text(self):
+    def load_raw_data(self):
         '''
-        Loads raw text from the dataset
+        Loads raw data from the dataset
         '''
-        logging.info("Loading raw text...")
         with open(self.dataset_path, 'r') as f:
             data = json.load(f)
         return pd.DataFrame(data)
+    
+    def load_images_list(self):
+        '''
+        Loads all image filenames from the image_folder
+        (.jpg only)
+        '''
+        if not self.image_folder:
+            logging.warning("Image folder not provided.")
+            return []
+
+        images_list = []
+        for filename in os.listdir(self.image_folder):
+            images_list.append(filename)
+        
+        logging.info("Loaded %d images from %s", len(images_list), self.image_folder)
+
+        return images_list
+
+    def clean_data(self):
+        '''
+        Cleans the raw data, dropping some actions,
+        protecting against null values, removing punctuation, 
+        and handling missing turn data for image filenames.
+        '''
+        df = pd.DataFrame(self.raw_data)
+
+        # Confirm valid "turn" value
+        df['turn'] = df['turn'].apply(lambda x: x if isinstance(x, str) and x.strip() else None)
+        df.dropna(subset=['turn'], inplace=True)
+
+        # Drops all actions but the first (multi-action prediction not yet supported)
+        df['actions'] = df['actions'].apply(lambda x: x[0] if isinstance(x, list) and len(x) > 0 else '')
+        
+        # Clean actions data
+        df['actions'] = df['actions'].astype(str).str.lower().str.replace('[^\w\s]', '', regex=True)
+
+        # Clean game_state data
+        df['game_state'] = df['game_state'].apply(lambda x: [str(text).lower().replace('[^\w\s]', '') for text in x])
+
+        # Handle null or missing values in 'actions' column
+        df['actions'] = df['actions'].fillna('')
+
+        # Handle null or missing values in 'game_state' column
+        df['game_state'] = df['game_state'].apply(lambda x: x if isinstance(x, list) else [])
+        df['game_state'] = df['game_state'].apply(lambda x: [text if text is not None else '' for text in x])
+
+        # Drop entries with no "screenshot" data
+        df.dropna(subset=['screenshot'], inplace=True)
+
+        # Drops turns that don't have an image
+        self.images_list = self.load_images_list()
+        df = df[df['screenshot'].apply(lambda x: x in self.images_list)]
+
+        # Store cleaned data
+        logging.debug("Example cleaned data: %s", df.head())
+        logging.debug("Cleaned data columns: %s", df.columns)
+        logging.debug("Cleaned data stored")
+
+        return df
 
     def load_and_embed_images(self):
         '''
@@ -91,63 +150,3 @@ class Dataset:
         logging.debug("Text embeddings generated")
         
         return text_embeddings
-
-    def clean_data(self):
-        '''
-        Cleans the raw data, dropping some actions,
-        protecting against null values, removing punctuation, 
-        and handling missing turn data for image filenames.
-        '''
-        logging.debug("Cleaning data")
-        df = pd.DataFrame(self.raw_text)
-
-        # Drops all actions but the first (multi-action prediction not supported yet)
-        df['actions'] = df['actions'].apply(lambda x: x[0] if isinstance(x, list) and len(x) > 0 else '')
-        
-        # Clean actions data
-        df['actions'] = df['actions'].astype(str).str.lower().str.replace('[^\w\s]', '', regex=True)
-
-        # Clean game_state data
-        df['game_state'] = df['game_state'].apply(lambda x: [text.lower().replace('[^\w\s]', '') for text in x])
-
-        # Handle null or missing values in 'actions' column
-        df['actions'] = df['actions'].fillna('')
-
-        # Handle null or missing values in 'game_state' column
-        df['game_state'] = df['game_state'].apply(lambda x: x if isinstance(x, list) else [])
-        df['game_state'] = df['game_state'].apply(lambda x: [text if text is not None else '' for text in x])
-
-        # Confirm valid "turn" value
-        df['turn'] = df['turn'].apply(lambda x: x if isinstance(x, str) and x.strip() else None)
-        df.dropna(subset=['turn'], inplace=True)
-
-        # Handle missing turn data for image filenames
-        df['screenshot'] = df['screenshot'].apply(lambda x: x if x in self.image_data else None)
-        df.dropna(subset=['screenshot'], inplace=True)
-
-        # Encode actions as labels
-        df['actions_encoded'] = self.label_encoder.fit_transform(df['actions'])
-
-        # Store cleaned data
-        self.cleaned_data = df
-        logging.debug("Example cleaned data: %s", df.head())
-        logging.debug("Cleaned data columns: %s", df.columns)
-        logging.debug("Cleaned data stored")
-
-        return df
-
-    def create_labels(self):
-        '''
-        Creates and returns one-hot encoded labels from actions data.
-        '''
-        logging.debug("Creating labels")
-        # Implement the logic to create one-hot encoded labels from actions data
-        # This is a placeholder and should be replaced with the actual implementation
-        return np.zeros((len(self.cleaned_data), len(self.label_encoder.classes_)))
-
-    def decode_actions(self, encoded_actions) -> list:
-        '''
-        Decodes numerical labels back to action text.
-        '''
-        logging.debug("Decoding actions")
-        return self.label_encoder.inverse_transform(encoded_actions)
