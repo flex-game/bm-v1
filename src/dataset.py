@@ -6,7 +6,7 @@ import json
 import numpy as np
 import pandas as pd
 from keras.applications.resnet50 import ResNet50, preprocess_input
-from keras.layers.experimental.preprocessing import TextVectorization
+from keras.layers import TextVectorization
 from keras.preprocessing import image
 from keras.models import Model
 from sklearn.preprocessing import LabelEncoder
@@ -24,7 +24,7 @@ class Dataset:
         self.cleaned_images_list = self.list_cleaned_images()
         self.image_embeddings = self.load_and_embed_images()
         self.text_embeddings = self.embed_text()
-        # self.labels = self.create_labels()
+        self.labels = self.label_actions()    
 
     def load_raw_data(self):
         '''
@@ -103,6 +103,7 @@ class Dataset:
 
         model = self._load_images_model()
 
+        # Preprocess all images at once to avoid creating tf.function in a loop
         preprocessed_images = self._preprocess_images()
         image_embeddings = self._embed_images(preprocessed_images, model)
         return image_embeddings
@@ -126,8 +127,9 @@ class Dataset:
         '''
         preprocessed_images = []
         
-        for filename in self.cleaned_images_list:
-            image_path = os.path.join(self.image_folder, filename)
+        # Preprocess all images at once
+        image_paths = [os.path.join(self.image_folder, filename) for filename in self.cleaned_images_list]
+        for image_path in image_paths:
             # Load image
             img = image.load_img(image_path, target_size=(224, 224))
             # Convert image to array
@@ -173,3 +175,17 @@ class Dataset:
         text_embeddings = text_embeddings.numpy()
         
         return text_embeddings
+
+    def label_actions(self) -> np.ndarray:
+        '''
+        Labels actions data
+        '''
+
+        # Assuming actions are categorical and need to be encoded
+        actions = self.cleaned_data['actions']
+        
+        # Convert actions to a numerical format, e.g., using LabelEncoder
+        label_encoder = LabelEncoder()
+        action_labels = label_encoder.fit_transform(actions)
+        
+        return action_labels
