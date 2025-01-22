@@ -43,9 +43,15 @@ def predict():
     # Load the model
     model = load_model('model.keras')
 
-    # Example prediction
-    image_data = np.random.rand(1, 224, 224, 3)  # Replace with actual image data
-    text_data = np.random.rand(1, 5000)  # Replace with actual text data
+    # Load the dataset for prediction
+    dataset = Dataset(dataset_path='data/dataset.json', image_folder='data/assets/predict')
+
+    # Select a random image and its corresponding text embedding
+    random_index = np.random.randint(len(dataset.image_embeddings))
+    image_data = np.expand_dims(dataset.image_embeddings[random_index], axis=0)
+    text_data = np.expand_dims(dataset.text_embeddings[random_index], axis=0)
+
+    # Make a prediction
     prediction = model.predict([image_data, text_data])
     
     print(prediction)

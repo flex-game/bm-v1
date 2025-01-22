@@ -73,9 +73,51 @@ saved_model/
 
 # Data assets
 /data/assets
+/data/assets/predict/
 
 # Test dataset
 data/test_dataset.json
 
 # Model file
 model.keras
+
+data/predict/1.jpg
+data/predict/2.jpg
+data/predict/3.jpg
+data/predict/4.jpg
+data/predict/5.jpg
+data/predict/6.jpg
+data/predict/7.jpg
+data/predict/8.jpg
+data/predict/9.jpg
+data/predict/10.jpg
+data/predict/11.jpg
+data/predict/12.jpg
+data/predict/13.jpg
+data/predict/14.jpg
+data/predict/15.jpg
+data/predict/16.jpg
+data/predict/17.jpg
+data/predict/18.jpg
+data/predict/19.jpg
+data/predict/20.jpg
+data/predict/21.jpg
+data/predict/22.jpg
+data/predict/23.jpg
+data/predict/24.jpg
+data/predict/25.jpg
+data/predict/26.jpg
+data/predict/27.jpg
+data/predict/28.jpg
+data/predict/29.jpg
+data/predict/30.jpg
+data/predict/31.jpg
+data/predict/32.jpg
+data/predict/33.jpg
+data/predict/34.jpg
+data/predict/35.jpg
+data/predict/36.jpg
+data/predict/37.jpg
+data/predict/38.jpg
+data/predict/39.jpg
+data/predict/40.jpg
