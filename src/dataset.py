@@ -9,63 +9,99 @@ from keras.applications.resnet50 import ResNet50, preprocess_input
 from keras.preprocessing import image
 from keras.models import Model
 from sklearn.preprocessing import LabelEncoder
+import logging
 
 s3 = boto3.client('s3')
 
-def preprocess_image(img_path: str) -> np.ndarray:
-    '''
-    Preprocesses an image for embedding.
-    '''
-    img = image.load_img(img_path, target_size=(224, 224))
-    img_data = image.img_to_array(img)
-    img_data = np.expand_dims(img_data, axis=0)
-    img_data = preprocess_input(img_data)
-
-    return img_data
-
 class Dataset:
     
-    def __init__(self, dataset_path: str, image_folder: str = None) -> None:
-        self.raw_data = self.load_raw_json(dataset_path) # Loads the raw data from a JSON file.
-        self.cleaned_data = None # Stores the cleaned data.
-        self.text_embeddings = None # Stores text embeddings for the game state.
-        self.image_embeddings = None # Stores image embeddings for the screenshot.
-        self.image_folder = image_folder # Image folder where the screenshots are stored.
-        self.image_data = self.load_images() if image_folder else None # Loads the images from the image folder.
-        self.label_encoder = LabelEncoder() # Encodes the output actions as labels.
+    def __init__(self, dataset_path: str, image_folder: str = None, embeddings_path=None) -> None:
+        logging.info("Initializing Dataset with path: %s and image folder: %s", dataset_path, image_folder)
+        self.dataset_path = dataset_path
+        self.image_folder = image_folder
+        self.raw_text = self.load_raw_text()
+        self.image_embeddings = self.load_and_embed_images()
+        self.text_embeddings = self.embed_text()
+        self.cleaned_data = self.clean_data()
+        self.labels = self.create_labels()
 
-    def load_raw_json(self, dataset_path: str) -> pd.DataFrame:
+    def load_raw_text(self):
         '''
-        Loads the raw data from a JSON file.
+        Loads raw text from the dataset
         '''
-        with open(dataset_path, 'r') as f:
+        logging.info("Loading raw text...")
+        with open(self.dataset_path, 'r') as f:
             data = json.load(f)
         return pd.DataFrame(data)
 
-    def load_images(self) -> dict:
+    def load_and_embed_images(self):
         '''
-        Loads the images from the image folder.
+        Loads and embeds images using ResNet50
         '''
-        image_data = {}
-        for filename in os.listdir(self.image_folder):
-            if filename.endswith('.jpg'):
-                img_path = os.path.join(self.image_folder, filename)
-                image_data[filename] = preprocess_image(img_path)
-        return image_data
+        logging.info("Loading and embedding images")
+        preprocessed_images = self.preprocess_images()
+        image_embeddings = self.embed_images()
+        return image_embeddings
 
-    def clean_json(self) -> pd.DataFrame:
+    def _preprocess_images(image_folder: str) -> np.ndarray:
+        '''
+        Helper function to load and preprocess images for ResNet50 embedding
+        '''
+        logging.info("Loading and preprocessing images from folder: %s", image_folder)
+        image_paths = [os.path.join(image_folder, filename) for filename in os.listdir(image_folder) if filename.endswith('.jpg')]
+        preprocessed_images = self.preprocess_images(image_paths)
+        
+        return preprocessed_images
+
+    def _embed_images(preprocessed_images: np.ndarray) -> np.ndarray:
+        '''
+        Embeds preprocessed images using ResNet50
+        '''
+        logging.debug("Embedding preprocessed image data")
+    
+        # Load ResNet50 model pre-trained on ImageNet
+        base_model = ResNet50(weights='imagenet')
+        model = Model(inputs=base_model.input, outputs=base_model.get_layer('avg_pool').output)
+
+        # Assumes preprocessed_images is an array of preprocessed images
+        embeddings = model.predict(preprocessed_images)
+
+        # Flatten the embeddings
+        image_embeddings = embeddings.reshape(embeddings.shape[0], -1)
+        logging.debug("Image embeddings generated")
+
+        return image_embeddings
+
+    def embed_text(self) -> np.ndarray:
+        '''
+        Embeds text using TF-IDF
+        '''
+        logging.debug("Embedding text data")
+        # Initialize CountVectorizer
+        vectorizer = CountVectorizer()
+
+        # Fit and transform the text data
+        text_embeddings = vectorizer.fit_transform(self.cleaned_data['game_state'].apply(lambda x: ' '.join(x)))
+
+        self.text_embeddings = text_embeddings.toarray()
+        logging.debug("Text embeddings generated")
+        
+        return self.text_embeddings
+
+    def clean_data(self):
         '''
         Cleans the raw data, dropping some actions,
         protecting against null values, removing punctuation, 
         and handling missing turn data for image filenames.
         '''
-        df = pd.DataFrame(self.raw_data)
+        logging.debug("Cleaning data")
+        df = pd.DataFrame(self.raw_text)
 
         # Drops all actions but the first (multi-action prediction not supported yet)
         df['actions'] = df['actions'].apply(lambda x: x[0] if isinstance(x, list) and len(x) > 0 else '')
-
+        
         # Clean actions data
-        df['actions'] = df['actions'].str.lower().str.replace('[^\w\s]', '')
+        df['actions'] = df['actions'].astype(str).str.lower().str.replace('[^\w\s]', '', regex=True)
 
         # Clean game_state data
         df['game_state'] = df['game_state'].apply(lambda x: [text.lower().replace('[^\w\s]', '') for text in x])
@@ -90,47 +126,24 @@ class Dataset:
 
         # Store cleaned data
         self.cleaned_data = df
+        logging.debug("Example cleaned data: %s", df.head())
+        logging.debug("Cleaned data columns: %s", df.columns)
+        logging.debug("Cleaned data stored")
 
         return df
-    
-    def embed_text(self) -> np.ndarray:
+
+    def create_labels(self):
         '''
-        Embeds text using TF-IDF
+        Creates and returns one-hot encoded labels from actions data.
         '''
-
-        # Initialize CountVectorizer
-        vectorizer = CountVectorizer()
-
-        # Fit and transform the text data
-        text_embeddings = vectorizer.fit_transform(self.cleaned_data['game_state'].apply(lambda x: ' '.join(x)))
-
-        self.text_embeddings = text_embeddings.toarray()
-        
-        return self.text_embeddings
-
-    def embed_image(self) -> np.ndarray:
-        '''
-        Embed images using ResNet50
-        '''
-
-        # Load ResNet50 model pre-trained on ImageNet
-        base_model = ResNet50(weights='imagenet')
-        model = Model(inputs=base_model.input, outputs=base_model.get_layer('avg_pool').output)
-
-        image_embeddings = []
-        for img_name in self.cleaned_data['screenshot']:
-            if img_name in self.image_data:
-                img_data = self.image_data[img_name]
-                embedding = model.predict(img_data)
-                image_embeddings.append(embedding.flatten())
-            else:
-                image_embeddings.append(np.zeros((2048,)))  # Assuming 2048 is the output size of avg_pool layer
-
-        self.image_embeddings = np.array(image_embeddings)
-        return self.image_embeddings
+        logging.debug("Creating labels")
+        # Implement the logic to create one-hot encoded labels from actions data
+        # This is a placeholder and should be replaced with the actual implementation
+        return np.zeros((len(self.cleaned_data), len(self.label_encoder.classes_)))
 
     def decode_actions(self, encoded_actions) -> list:
         '''
         Decodes numerical labels back to action text.
         '''
+        logging.debug("Decoding actions")
         return self.label_encoder.inverse_transform(encoded_actions)
