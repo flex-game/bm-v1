@@ -46,7 +46,7 @@ def download_all_texts(bucket_name):
 
     return texts_data
 
-def download_all_images(bucket_name, output_folder):
+def download_all_images(bucket_name, output_folder, prefix=''):
     logger.info(f"Downloading all images from bucket: {bucket_name} with prefix: {prefix}")
     image_keys = []
     response = s3.list_objects_v2(Bucket=bucket_name, Prefix=prefix)
